@@ -165,13 +165,52 @@ After PRD is approved, suggest the workflow:
 2. `/codebrain:epic create` — generate tech spec and tickets from the PRD
 3. `/codebrain:design` — create UI mockups (if feature has a UI)
 
-## Integration with Linear
+## Linear Integration (Mandatory when linearSync is enabled)
 
-If Linear MCP is available, offer to create a Linear project/issue from the PRD:
-- Create a Linear project named after the feature
-- Create Linear issues for each P0 requirement
-- Tag P1/P2 as backlog items
-- Link the PRD document in the project description
+### Pre-Check: Linear Connection
+Before starting, check if Linear MCP tools are available (look for `mcp__linear__*` tools in the toolbox).
+- Read `.codebrain/config.json` for `linearSync` setting (`"required"` | `"optional"` | `"off"`)
+- If `linearSync: "required"` and Linear MCP is NOT connected: **STOP** and tell the user: "Linear sync is required but Linear MCP is not connected. Run /mcp to authenticate with Linear."
+- If `linearSync: "optional"` and Linear is available: proceed with sync
+- If `linearSync: "off"` or not set: skip Linear integration
+
+### Step 6b: Linear Sync (after Step 6: Persist locally)
+
+1. **Check for existing Linear project:**
+   - Call `list_projects` with name filter matching the feature name
+   - If a project already exists, use it (don't create a duplicate)
+   - If no project exists, call `create_project` with:
+     - Name: feature name from PRD title
+     - Description: PRD overview section (first 500 chars)
+
+2. **Create the PRD as a Linear project document:**
+   - Use the project's document feature to store the full PRD text
+   - This makes the PRD accessible across all Claude Code sessions — agents read it from Linear, not stale local files
+
+3. **Create P0 requirement issues:**
+   - For each P0 requirement (REQ-001, REQ-002, etc.), call `create_issue` with:
+     - Title: requirement summary
+     - Description: full EARS statement + Given/When/Then acceptance criteria
+     - Priority: 1 (Urgent) for P0
+     - Labels: `codebrain`, `p0`, epic slug
+     - Team: auto-detect from `list_teams` (use first team, or ask user if multiple)
+
+4. **Create P1/P2 as backlog issues:**
+   - For each P1 requirement: priority 2 (High), label `p1`
+   - For each P2 requirement: priority 3 (Medium), label `p2`
+
+5. **Record Linear project ID** in `.codebrain/config.json`:
+   ```json
+   { "linearProjectId": "proj_xxx", "linearTeamId": "team_xxx" }
+   ```
+   This allows all downstream skills (epic, plan, verify, launch, retro) to find the Linear project.
+
+### Anti-Drift: Linear as Source of Truth
+When `linearSync` is `"required"`:
+- The PRD in Linear's project documents is the **canonical version**
+- The local `.codebrain/epics/{slug}/prd.md` is a **cache**
+- If the user edits the PRD in Linear directly, the local copy is stale
+- Before any downstream skill reads the PRD, it should call `list_documents` + `get_document` to get the latest version
 
 ## Rules
 

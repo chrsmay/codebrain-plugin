@@ -58,14 +58,101 @@ Before creating an epic, consider running the full lifecycle:
 
 You can start at any phase. But the further upstream you start, the fewer surprises downstream.
 
-## Linear Integration
+## Linear Integration (Mandatory when linearSync is enabled)
 
-If the Linear MCP is available, epic commands will sync with Linear:
-- **create**: Creates a Linear project + issues for each ticket
-- **work**: Updates Linear issue status as tickets are completed
-- **status**: Pulls status from both local files AND Linear
+### Pre-Check
+Read `.codebrain/config.json` for `linearSync` and `linearProjectId`.
+- If `linearSync: "required"` and Linear MCP is NOT connected: **STOP** with auth message.
+- If `linearSync: "required"` or `"optional"` (with Linear available): all subcommands sync with Linear.
 
-To check: look for `mcp__linear__*` tools. If available, ask the user if they want Linear sync.
+### Linear as Source of Truth for Work Items
+When Linear sync is active, Linear is the **canonical source** for:
+- Issue status (not local ticket files)
+- Issue comments (verification reports, clarifications)
+- Issue relations (blocks/blocked-by dependencies)
+- Project health (project updates)
+
+Local `.codebrain/epics/` files become a **cache** for offline fallback.
+
+### create — Linear Sync Steps
+
+After generating specs and tickets locally (Step 7), perform these Linear operations:
+
+1. **Check for existing project:**
+   - Call `list_projects` filtering by epic name
+   - If found: use existing project (resume, don't duplicate)
+   - If not found: call `create_project` with name, description (from PRD overview)
+
+2. **Store specs as Linear project documents:**
+   - PRD → project document (if not already created by `/codebrain:prd`)
+   - Tech spec → project document
+   - Journey map → project document (if exists)
+
+3. **Create Linear issues for each ticket:**
+   - Call `create_issue` for each ticket with:
+     - **Title**: ticket title
+     - **Description**: full ticket content including Given/When/Then acceptance criteria in markdown
+     - **Priority**: P0 tickets → 1 (Urgent), P1 → 2 (High), P2 → 3 (Medium)
+     - **Labels**: `codebrain`, epic slug, ticket type (e.g., `feature`, `test`, `refactor`)
+     - **parentId**: use a parent "epic" issue to group all tickets as sub-issues
+   - Record the Linear issue ID in each local ticket file (append `linear_id: ISS-xxx`)
+
+4. **Create issue relations for dependencies:**
+   - For each `depends_on` in the ticket DAG:
+     - The dependent ticket **is blocked by** its dependency
+     - This maps to Linear's blocks/blocked-by relation
+   - Blocked issues show a red flag in Linear until their blocker is resolved
+
+5. **Create project milestones** (if tickets have execution phases):
+   - Phase 1 tickets → Milestone "Foundation"
+   - Phase 2 tickets → Milestone "Core Features"
+   - Phase 3 tickets → Milestone "Polish & Testing"
+
+6. **Save Linear metadata** to `.codebrain/config.json`:
+   ```json
+   {
+     "linearProjectId": "proj_xxx",
+     "linearTeamId": "team_xxx",
+     "linearIssueMap": {
+       "001-setup-database": "ISS-123",
+       "002-create-api": "ISS-124"
+     }
+   }
+   ```
+
+### work — Linear Sync Steps
+
+Before starting work on a ticket:
+
+1. **Read from Linear first** (not local files):
+   - Call `get_issue` with the ticket's Linear ID to get:
+     - Current status (is it still Ready? Or already In Progress by another session?)
+     - Latest description (may have been edited in Linear)
+     - Comments (clarifications, prior verification results, team feedback)
+   - If status is already "Done": skip this ticket, move to next
+   - If status is "In Progress": warn user — may be in progress in another session
+
+2. **Update Linear status:**
+   - Call `update_issue` to set status to "In Progress" when starting
+   - This prevents another session/agent from picking up the same ticket
+
+3. **After completion:**
+   - Call `update_issue` to set status to "Done" (or "In Review" if verification pending)
+   - Call `create_comment` with execution summary:
+     - What was implemented
+     - Files changed
+     - Any `[SPEC_DEVIATION]` markers
+     - Verification result (pass/fail)
+
+### status — Linear Sync Steps
+
+1. Call `list_issues` filtered by the Linear project ID
+2. Merge with local `.codebrain/` status (Linear is authoritative for status, local for file content)
+3. Display unified view:
+   - Progress: N/M issues Done
+   - Board: Done | In Progress | Ready | Blocked (from Linear statuses)
+   - Blocked issues: show which issues block them (from Linear relations)
+   - Recent comments: last 3 comments across all issues
 
 ## Subcommand: create
 
@@ -134,15 +221,9 @@ To check: look for `mcp__linear__*` tools. If available, ask the user if they wa
    - Create `epic.md` overview with title, status, summary
    - Create `decisions.md` with decisions from the requirement gathering phase
 
-8. **Sync with Linear** (if Linear MCP available and user opted in):
-   - Create a Linear project for the epic
-   - Create Linear issues for each ticket with:
-     - Title and description from ticket file
-     - Given/When/Then acceptance criteria in the description
-     - Priority: P0 tickets = Urgent, P1 = High, P2 = Low
-     - Labels: `codebrain`, epic slug
-     - Dependencies mapped between issues
-   - Link the PRD and journey map in the project description
+8. **Sync with Linear** (see "Linear Integration" section above for full details):
+   - Execute all 6 Linear sync steps: check existing project, store docs, create issues, create relations, create milestones, save metadata
+   - This is MANDATORY when `linearSync: "required"` in config
 
 9. **Report** what was created — show the epic overview and ticket list.
    - If Linear synced: include Linear project URL

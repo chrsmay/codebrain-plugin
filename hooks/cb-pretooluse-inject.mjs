@@ -4,197 +4,175 @@
  * Fires on Read/Edit/Write/Bash tool calls.
  * Matches tool targets against skill pathPatterns/bashPatterns,
  * deduplicates, ranks by priority, respects budget, outputs additionalContext.
+ * Fully synchronous to avoid timeout/cancellation issues.
  */
 
-import { join } from "node:path";
-import {
-  pluginRoot, readStdinJson, writeHookOutput, safeReadFile,
-  tryClaimSkill, listClaimedSkills, clearHighPrioritySkills,
-} from "./cb-env.mjs";
-import {
-  compileSkillPatterns, matchPathWithReason, matchBashWithReason, rankEntries,
-} from "./cb-patterns.mjs";
+import { readFileSync, existsSync, mkdirSync, writeFileSync, readdirSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
+import { tmpdir } from "node:os";
+import { compileSkillPatterns, matchPathWithReason, matchBashWithReason, rankEntries } from "./cb-patterns.mjs";
 import { buildSkillMap } from "./cb-skill-map.mjs";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const PLUGIN_ROOT = join(__dirname, "..");
 
 // ── Constants ────────────────────────────────────────────
 const MAX_SKILLS = 3;
 const INJECTION_BUDGET_BYTES = 18000;
 const COMPACTION_REINJECT_PRIORITY = 7;
-const SUMMARY_TEMPLATE = (skill) =>
-  `You must run the Skill(codebrain:${skill}) tool.`;
 
-// ── Cached state ─────────────────────────────────────────
-let cachedSkillMap = null;
-let cachedCompiled = null;
-
-function loadSkills() {
-  if (cachedSkillMap) return { skillMap: cachedSkillMap, compiled: cachedCompiled };
-
-  const root = pluginRoot();
-  const skillsDir = join(root, "skills");
-  cachedSkillMap = buildSkillMap(skillsDir);
-  cachedCompiled = compileSkillPatterns(cachedSkillMap);
-
-  return { skillMap: cachedSkillMap, compiled: cachedCompiled };
+// ── Read stdin synchronously ─────────────────────────────
+let input = {};
+try {
+  const raw = readFileSync(0, { encoding: "utf-8" });
+  if (raw) input = JSON.parse(raw);
+} catch {
+  // No stdin available — exit cleanly
+  process.stdout.write("{}");
+  process.exit(0);
 }
 
-// ── Main ─────────────────────────────────────────────────
-async function main() {
-  const input = await readStdinJson();
-  const toolName = input.tool_name || "";
-  const toolInput = input.tool_input || {};
-  const sessionId = input.session_id || "default";
+const toolName = input.tool_name || "";
+const toolInput = input.tool_input || {};
+const sessionId = input.session_id || "default";
 
-  // Check for compaction reset
-  if (process.env.CODEBRAIN_CONTEXT_COMPACTED === "true") {
-    const { skillMap } = loadSkills();
-    clearHighPrioritySkills(sessionId, skillMap, COMPACTION_REINJECT_PRIORITY);
-    // Clear the flag (best effort — env vars may not persist across hooks)
-    delete process.env.CODEBRAIN_CONTEXT_COMPACTED;
-  }
+function out(additionalContext) {
+  if (!additionalContext) { process.stdout.write("{}"); }
+  else { process.stdout.write(JSON.stringify({ hookSpecificOutput: { additionalContext } })); }
+  process.exit(0);
+}
 
-  const { skillMap, compiled } = loadSkills();
+// ── Dedup helpers (inline to avoid async imports) ────────
+function safeSessionSegment(sid) {
+  if (!sid) return "default";
+  if (/^[a-zA-Z0-9_-]+$/.test(sid) && sid.length < 80) return sid;
+  return createHash("sha256").update(sid).digest("hex").slice(0, 24);
+}
 
-  // ── Match skills against tool target ───────────────────
-  const matches = [];
+const dedupDir = join(tmpdir(), `codebrain-${safeSessionSegment(sessionId)}-seen-skills.d`);
 
-  if (toolName === "Bash") {
-    const command = toolInput.command || "";
-    if (!command) return writeHookOutput(null);
+function getSeenSkills() {
+  if (!existsSync(dedupDir)) return new Set();
+  try { return new Set(readdirSync(dedupDir).map(f => decodeURIComponent(f))); } catch { return new Set(); }
+}
 
-    for (const [name, patterns] of Object.entries(compiled)) {
-      if (!patterns.bashRegexes.length) continue;
-      const reason = matchBashWithReason(command, patterns.bashRegexes);
-      if (reason) {
-        matches.push({
-          skill: name,
-          priority: skillMap[name].priority || 0,
-          reason,
-        });
+function claimSkill(name) {
+  if (!existsSync(dedupDir)) mkdirSync(dedupDir, { recursive: true });
+  const file = join(dedupDir, encodeURIComponent(name));
+  if (existsSync(file)) return false;
+  try { writeFileSync(file, Date.now().toString(), { flag: "wx" }); return true; } catch { return false; }
+}
+
+// ── Load skills ──────────────────────────────────────────
+const skillMap = buildSkillMap(join(PLUGIN_ROOT, "skills"));
+const compiled = compileSkillPatterns(skillMap);
+
+// ── Check for compaction reset ───────────────────────────
+if (process.env.CODEBRAIN_CONTEXT_COMPACTED === "true") {
+  // Clear seen-skills for high-priority skills so they re-inject
+  if (existsSync(dedupDir)) {
+    try {
+      for (const f of readdirSync(dedupDir)) {
+        const skillName = decodeURIComponent(f);
+        const skill = skillMap[skillName];
+        if (skill && (skill.priority || 0) >= COMPACTION_REINJECT_PRIORITY) {
+          try { require("fs").unlinkSync(join(dedupDir, f)); } catch {}
+        }
       }
-    }
-  } else if (["Read", "Edit", "Write"].includes(toolName)) {
-    const filePath = toolInput.file_path || "";
-    if (!filePath) return writeHookOutput(null);
+    } catch {}
+  }
+  delete process.env.CODEBRAIN_CONTEXT_COMPACTED;
+}
 
-    for (const [name, patterns] of Object.entries(compiled)) {
-      if (!patterns.pathRegexes.length) continue;
-      const reason = matchPathWithReason(filePath, patterns.pathRegexes);
-      if (reason) {
-        matches.push({
-          skill: name,
-          priority: skillMap[name].priority || 0,
-          reason,
-        });
-      }
+// ── Match skills against tool target ─────────────────────
+const matches = [];
+
+if (toolName === "Bash") {
+  const command = toolInput.command || "";
+  if (!command) out(null);
+
+  for (const [name, patterns] of Object.entries(compiled)) {
+    if (!patterns.bashRegexes.length) continue;
+    const reason = matchBashWithReason(command, patterns.bashRegexes);
+    if (reason) matches.push({ skill: name, priority: skillMap[name].priority || 0, reason });
+  }
+} else if (["Read", "Edit", "Write"].includes(toolName)) {
+  const filePath = toolInput.file_path || "";
+  if (!filePath) out(null);
+
+  for (const [name, patterns] of Object.entries(compiled)) {
+    if (!patterns.pathRegexes.length) continue;
+    const reason = matchPathWithReason(filePath, patterns.pathRegexes);
+    if (reason) matches.push({ skill: name, priority: skillMap[name].priority || 0, reason });
+  }
+} else {
+  out(null);
+}
+
+if (matches.length === 0) out(null);
+
+// ── Dedup against seen skills ────────────────────────────
+const seenSkills = getSeenSkills();
+const fresh = matches.filter(m => !seenSkills.has(m.skill));
+if (fresh.length === 0) out(null);
+
+// ── Rank by priority ─────────────────────────────────────
+const ranked = rankEntries(fresh);
+
+// ── Inject with budget management ────────────────────────
+const injected = [];
+const summaryOnly = [];
+const droppedByCap = [];
+let usedBytes = 0;
+
+for (const entry of ranked) {
+  if (injected.length >= MAX_SKILLS) { droppedByCap.push(entry.skill); continue; }
+
+  const skill = skillMap[entry.skill];
+  if (!skill) continue;
+
+  const content = `# codebrain:${entry.skill}\n\nInvoke with: /codebrain:${entry.skill}\n\n${skill.body || ""}`;
+  const byteLen = Buffer.byteLength(content, "utf-8");
+
+  if (injected.length > 0 && usedBytes + byteLen > INJECTION_BUDGET_BYTES) {
+    const summary = `You must run the Skill(codebrain:${entry.skill}) tool.`;
+    const summaryBytes = Buffer.byteLength(summary, "utf-8");
+    if (usedBytes + summaryBytes <= INJECTION_BUDGET_BYTES) {
+      summaryOnly.push({ skill: entry.skill, summary });
+      usedBytes += summaryBytes;
     }
-  } else {
-    return writeHookOutput(null);
+    continue;
   }
 
-  if (matches.length === 0) return writeHookOutput(null);
+  if (!claimSkill(entry.skill)) continue;
 
-  // ── Dedup against seen skills ──────────────────────────
-  const seenSkills = new Set(listClaimedSkills(sessionId));
-  const fresh = matches.filter(m => !seenSkills.has(m.skill));
+  injected.push({ skill: entry.skill, content });
+  usedBytes += byteLen;
+}
 
-  if (fresh.length === 0) return writeHookOutput(null);
+if (injected.length === 0 && summaryOnly.length === 0) out(null);
 
-  // ── Rank by priority ───────────────────────────────────
-  const ranked = rankEntries(fresh);
+// ── Build output ─────────────────────────────────────────
+const parts = [];
+parts.push("[codebrain] Skills auto-injected based on detected patterns:");
+for (const i of injected) {
+  const match = ranked.find(r => r.skill === i.skill);
+  parts.push(`  - "${i.skill}" matched: ${match?.reason?.matchType || "pattern"} (${match?.reason?.pattern || ""})`);
+}
+parts.push("");
 
-  // ── Inject with budget management ──────────────────────
-  const injected = [];
-  const summaryOnly = [];
-  const droppedByCap = [];
-  let usedBytes = 0;
-
-  for (const entry of ranked) {
-    if (injected.length >= MAX_SKILLS) {
-      droppedByCap.push(entry.skill);
-      continue;
-    }
-
-    const skill = skillMap[entry.skill];
-    if (!skill) continue;
-
-    // Build the injection content
-    const content = buildSkillContent(entry.skill, skill);
-    const byteLen = Buffer.byteLength(content, "utf-8");
-
-    if (injected.length > 0 && usedBytes + byteLen > INJECTION_BUDGET_BYTES) {
-      // Try summary-only fallback
-      const summary = SUMMARY_TEMPLATE(entry.skill);
-      const summaryBytes = Buffer.byteLength(summary, "utf-8");
-
-      if (usedBytes + summaryBytes <= INJECTION_BUDGET_BYTES) {
-        summaryOnly.push({ skill: entry.skill, summary });
-        usedBytes += summaryBytes;
-      }
-      continue;
-    }
-
-    // Claim the skill in session dedup
-    if (!tryClaimSkill(sessionId, entry.skill)) {
-      continue; // Another process claimed it
-    }
-
-    injected.push({ skill: entry.skill, content });
-    usedBytes += byteLen;
-  }
-
-  if (injected.length === 0 && summaryOnly.length === 0) {
-    return writeHookOutput(null);
-  }
-
-  // ── Build output ───────────────────────────────────────
-  const parts = [];
-
-  // Banner
-  parts.push("[codebrain] Skills auto-injected based on detected patterns:");
-  for (const i of injected) {
-    const match = ranked.find(r => r.skill === i.skill);
-    parts.push(`  - "${i.skill}" matched: ${match?.reason?.matchType || "pattern"} (${match?.reason?.pattern || ""})`);
-  }
-
+for (const i of injected) {
+  parts.push(`--- codebrain:${i.skill} ---`);
+  parts.push(i.content);
+  parts.push(`--- end codebrain:${i.skill} ---`);
   parts.push("");
-
-  // Full skill content
-  for (const i of injected) {
-    parts.push(`--- codebrain:${i.skill} ---`);
-    parts.push(i.content);
-    parts.push(`--- end codebrain:${i.skill} ---`);
-    parts.push("");
-  }
-
-  // Summary-only references
-  for (const s of summaryOnly) {
-    parts.push(s.summary);
-  }
-
-  // Metadata comment
-  const meta = {
-    version: 1,
-    hookEvent: "PreToolUse",
-    toolName,
-    matchedSkills: ranked.map(r => r.skill),
-    injectedSkills: injected.map(i => i.skill),
-    summaryOnly: summaryOnly.map(s => s.skill),
-    droppedByCap,
-  };
-  parts.push(`<!-- codebrain:skillInjection: ${JSON.stringify(meta)} -->`);
-
-  writeHookOutput(parts.join("\n"));
 }
 
-/**
- * Build injectable content for a skill.
- * Returns the skill body with a header.
- */
-function buildSkillContent(name, skill) {
-  const header = `# codebrain:${name}\n\nInvoke with: /codebrain:${name}\n\n`;
-  return header + (skill.body || "");
-}
+for (const s of summaryOnly) { parts.push(s.summary); }
 
-// ── Run ──────────────────────────────────────────────────
-main().catch(() => writeHookOutput(null));
+const meta = { version: 1, hookEvent: "PreToolUse", toolName, matchedSkills: ranked.map(r => r.skill), injectedSkills: injected.map(i => i.skill), summaryOnly: summaryOnly.map(s => s.skill), droppedByCap };
+parts.push(`<!-- codebrain:skillInjection: ${JSON.stringify(meta)} -->`);
+
+out(parts.join("\n"));

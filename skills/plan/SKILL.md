@@ -51,6 +51,33 @@ Single-task implementation planning with automatic verification. The core Plan �
 
 ## Workflow
 
+### Phase 0: Linear Context Loading (when linearSync is enabled)
+
+Read `.codebrain/config.json` for `linearSync`, `linearProjectId`, and `linearIssueMap`.
+
+If `linearSync` is `"required"` or `"optional"` (with Linear available):
+
+1. **Identify the Linear issue for this task:**
+   - If working on an epic ticket: look up the ticket slug in `linearIssueMap` to get the Linear issue ID
+   - Call `get_issue` with the issue ID to load:
+     - **Latest description** (may have been updated in Linear since last session)
+     - **Current status** (if already "Done" → warn and stop; if "In Progress" → warn about concurrent work)
+     - **Acceptance criteria** from the description
+   - Call `list_comments` to load:
+     - Clarifications from team members
+     - Prior verification results
+     - Any `[NEEDS CLARIFICATION]` resolutions posted as comments
+   - If the Linear description differs from the local ticket file: **use the Linear version** (it's the source of truth)
+
+2. **Update Linear status:**
+   - Call `update_issue` to set status to "In Progress"
+   - This signals to other sessions/agents that this ticket is being worked on
+
+3. **Load the PRD from Linear (not local cache):**
+   - Call `list_documents` for the project to find the PRD document
+   - Call `get_document` to read the latest PRD
+   - Use this for spec reconciliation later (Phase 4b)
+
 ### Phase 1: Context Loading
 1. Call `mcp__codebrain__codebrain_memory_read` with `file: "all"` to load project memory.
 2. **Read constitution** — `.codebrain/memory/constitution.md` is non-negotiable.
@@ -121,6 +148,32 @@ If the task description mentions API endpoints, SDKs, or third-party integration
     - Add a `[SPEC_DEVIATION: plan says X, implementation does Y — reason: Z]` marker
     - Ask the user: update the plan to match, or fix the code?
 18. If this plan was for an epic ticket, update the ticket's execution log.
+
+### Phase 4c: Linear Post-Completion (when linearSync is enabled)
+
+If Linear sync is active and this task maps to a Linear issue:
+
+1. **Update issue status:**
+   - If verification PASSED: call `update_issue` to set status to "Done"
+   - If verification FAILED but within fix cycles: keep as "In Progress"
+   - If verification FAILED after 3 cycles: set to "In Review" for manual attention
+
+2. **Post completion comment:**
+   - Call `create_comment` on the issue with:
+     ```markdown
+     ## Implementation Complete
+
+     **Verification:** PASS/FAIL
+     **Files changed:** [list of modified files]
+     **Spec deviations:** [any SPEC_DEVIATION markers and their resolution]
+     **Key decisions:** [decisions made during implementation]
+
+     Executed by codebrain:plan on [date]
+     ```
+
+3. **Check for unblocked downstream tickets:**
+   - If this ticket was blocking others (via Linear issue relations), those tickets are now unblocked
+   - Note which tickets are now ready in the completion report
 
 ### Phase 5: Memory Update
 19. Call `mcp__codebrain__codebrain_memory_update` for `continuity` with:

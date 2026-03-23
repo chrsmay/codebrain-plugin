@@ -132,6 +132,51 @@ Spec compliance and code quality verification. Checks implementation against a p
 6. **Persist the report.**
    - Call `mcp__codebrain__codebrain_artifact_write` to save to `.codebrain/active/verification.md`
 
+7. **Linear Sync** (when linearSync is enabled):
+
+   Read `.codebrain/config.json` for `linearSync`, `linearProjectId`, `linearIssueMap`.
+
+   If Linear sync is active:
+
+   a. **Post verification report as a Linear comment:**
+      - Identify the Linear issue for the verified ticket (from `linearIssueMap`)
+      - Call `create_comment` with the verification report in markdown:
+        ```markdown
+        ## Verification Report — [date]
+
+        **Verdict:** PASS / FAIL
+        **Spec:** [spec file path]
+
+        ### Automated Checks
+        | Check | Result |
+        |-------|--------|
+        | Build | PASS/FAIL |
+        | Tests | PASS/FAIL |
+        | Lint | PASS/FAIL |
+
+        ### Acceptance Criteria
+        | # | Criterion | Result | Evidence |
+        |---|-----------|--------|----------|
+        | 1 | [criterion] | PASS/FAIL | [file:line] |
+
+        ### Spec Deviations
+        [any SPEC_DEVIATION markers]
+        ```
+
+   b. **Update issue status:**
+      - If verdict is PASS: call `update_issue` to set status to "Done"
+      - If verdict is FAIL (Critical): set status to "In Progress" (needs fix)
+      - If verdict is FAIL after 3 fix cycles: set status to "In Review" (needs human attention)
+
+   c. **Update spec deviations in Linear:**
+      - For each `[SPEC_DEVIATION]` that the user chose to accept:
+        - Update the Linear issue description to reflect the new spec
+        - This keeps Linear as the source of truth for acceptance criteria
+
+   d. **Flag unblocked tickets:**
+      - If this ticket was blocking others, those are now unblocked
+      - Call `list_issues` to find related blocked issues and note them in the report
+
 ## Verification Report Format
 
 ```markdown

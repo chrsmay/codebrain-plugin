@@ -6,7 +6,7 @@
     },
     "codebase-memory": {
       "command": "npx",
-      "args": ["-y", "codebase-memory-mcp"]
+      "args": ["-y", "@modelcontextprotocol/server-memory"]
     },
     "code-review-graph": {
       "command": "uvx",
@@ -26,7 +26,7 @@
     },
     "sentry": {
       "type": "http",
-      "url": "https://mcp.sentry.dev/sse"
+      "url": "https://mcp.sentry.dev/mcp"
     },
     "pare": {
       "command": "npx",

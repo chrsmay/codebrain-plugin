@@ -3,128 +3,137 @@
  * cb-prompt-inject.mjs — UserPromptSubmit prompt signal injection
  * Fires when the user submits a prompt. Scores the prompt against
  * all skills' promptSignals, selects top matches, injects as context.
+ * Fully synchronous to avoid timeout/cancellation issues.
  */
 
-import { join } from "node:path";
-import {
-  pluginRoot, readStdinJson, writeHookOutput, safeReadFile,
-  tryClaimSkill, listClaimedSkills,
-} from "./cb-env.mjs";
-import { buildSkillMap } from "./cb-skill-map.mjs";
-import { matchPromptAgainstSkills } from "./cb-prompt-patterns.mjs";
+import { readFileSync, existsSync, mkdirSync, writeFileSync, readdirSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
+import { tmpdir } from "node:os";
 
-// ── Constants ────────────────────────────────────────────
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const PLUGIN_ROOT = join(__dirname, "..");
 const MAX_PROMPT_SKILLS = 2;
 const PROMPT_BUDGET_BYTES = 8000;
-const SUMMARY_TEMPLATE = (skill) =>
-  `You must run the Skill(codebrain:${skill}) tool.`;
 
-// ── Main ─────────────────────────────────────────────────
-async function main() {
-  const input = await readStdinJson();
-  const userPrompt = input.user_prompt || input.prompt || "";
-  const sessionId = input.session_id || "default";
+// ── Read stdin synchronously ─────────────────────────────
+let input = {};
+try {
+  const raw = readFileSync(0, { encoding: "utf-8" });
+  if (raw) input = JSON.parse(raw);
+} catch {
+  process.stdout.write("{}");
+  process.exit(0);
+}
 
-  if (!userPrompt || userPrompt.length < 5) {
-    return writeHookOutput(null);
-  }
+const userPrompt = input.user_prompt || input.prompt || "";
+const sessionId = input.session_id || "default";
 
-  // Load skill map
-  const root = pluginRoot();
-  const skillMap = buildSkillMap(join(root, "skills"));
+if (!userPrompt || userPrompt.length < 5) {
+  process.stdout.write("{}");
+  process.exit(0);
+}
 
-  // Match prompt against all skills
-  const matches = matchPromptAgainstSkills(userPrompt, skillMap);
+// ── Import skill map and prompt matching ─────────────────
+const { buildSkillMap } = await import("./cb-skill-map.mjs");
+const { matchPromptAgainstSkills } = await import("./cb-prompt-patterns.mjs");
 
-  if (matches.length === 0) return writeHookOutput(null);
+const skillMap = buildSkillMap(join(PLUGIN_ROOT, "skills"));
+const matches = matchPromptAgainstSkills(userPrompt, skillMap);
 
-  // Dedup against already-seen skills
-  const seenSkills = new Set(listClaimedSkills(sessionId));
-  const fresh = matches.filter(m => !seenSkills.has(m.skill));
+if (matches.length === 0) {
+  process.stdout.write("{}");
+  process.exit(0);
+}
 
-  if (fresh.length === 0) return writeHookOutput(null);
+// ── Dedup against seen skills ────────────────────────────
+function safeSessionSegment(sid) {
+  if (!sid) return "default";
+  if (/^[a-zA-Z0-9_-]+$/.test(sid) && sid.length < 80) return sid;
+  return createHash("sha256").update(sid).digest("hex").slice(0, 24);
+}
 
-  // Select top N matches within budget
-  const injected = [];
-  const summaryOnly = [];
-  let usedBytes = 0;
+function getSeenSkills() {
+  const dir = join(tmpdir(), `codebrain-${safeSessionSegment(sessionId)}-seen-skills.d`);
+  if (!existsSync(dir)) return new Set();
+  try {
+    return new Set(readdirSync(dir).map(f => decodeURIComponent(f)));
+  } catch { return new Set(); }
+}
 
-  for (const match of fresh.slice(0, MAX_PROMPT_SKILLS + 2)) {
-    if (injected.length >= MAX_PROMPT_SKILLS) break;
+function claimSkill(name) {
+  const dir = join(tmpdir(), `codebrain-${safeSessionSegment(sessionId)}-seen-skills.d`);
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  const file = join(dir, encodeURIComponent(name));
+  if (existsSync(file)) return false;
+  try { writeFileSync(file, Date.now().toString(), { flag: "wx" }); return true; } catch { return false; }
+}
 
-    const skill = skillMap[match.skill];
-    if (!skill) continue;
+const seenSkills = getSeenSkills();
+const fresh = matches.filter(m => !seenSkills.has(m.skill));
 
-    const content = buildSkillContent(match.skill, skill);
-    const byteLen = Buffer.byteLength(content, "utf-8");
+if (fresh.length === 0) {
+  process.stdout.write("{}");
+  process.exit(0);
+}
 
-    if (injected.length > 0 && usedBytes + byteLen > PROMPT_BUDGET_BYTES) {
-      // Try summary fallback
-      const summary = SUMMARY_TEMPLATE(match.skill);
-      const summaryBytes = Buffer.byteLength(summary, "utf-8");
-      if (usedBytes + summaryBytes <= PROMPT_BUDGET_BYTES) {
-        summaryOnly.push({ skill: match.skill, summary });
-        usedBytes += summaryBytes;
-      }
-      continue;
+// ── Inject top matches within budget ─────────────────────
+const injected = [];
+const summaryOnly = [];
+let usedBytes = 0;
+
+for (const match of fresh.slice(0, MAX_PROMPT_SKILLS + 2)) {
+  if (injected.length >= MAX_PROMPT_SKILLS) break;
+
+  const skill = skillMap[match.skill];
+  if (!skill) continue;
+
+  const content = `# codebrain:${match.skill}\n\nInvoke with: /codebrain:${match.skill}\n\n${skill.body || ""}`;
+  const byteLen = Buffer.byteLength(content, "utf-8");
+
+  if (injected.length > 0 && usedBytes + byteLen > PROMPT_BUDGET_BYTES) {
+    const summary = `You must run the Skill(codebrain:${match.skill}) tool.`;
+    const summaryBytes = Buffer.byteLength(summary, "utf-8");
+    if (usedBytes + summaryBytes <= PROMPT_BUDGET_BYTES) {
+      summaryOnly.push({ skill: match.skill, summary });
+      usedBytes += summaryBytes;
     }
-
-    // Claim in dedup
-    if (!tryClaimSkill(sessionId, match.skill)) continue;
-
-    injected.push({
-      skill: match.skill,
-      content,
-      score: match.score,
-      matchedPhrases: match.matchedPhrases,
-    });
-    usedBytes += byteLen;
+    continue;
   }
 
-  if (injected.length === 0 && summaryOnly.length === 0) {
-    return writeHookOutput(null);
-  }
+  if (!claimSkill(match.skill)) continue;
 
-  // ── Build output ───────────────────────────────────────
-  const parts = [];
+  injected.push({ skill: match.skill, content, score: match.score, matchedPhrases: match.matchedPhrases });
+  usedBytes += byteLen;
+}
 
-  parts.push("[codebrain] Skills auto-suggested based on prompt analysis:");
-  for (const i of injected) {
-    parts.push(`  - "${i.skill}" matched: prompt signal (score ${i.score}, phrases: ${i.matchedPhrases.join(", ")})`);
-  }
+if (injected.length === 0 && summaryOnly.length === 0) {
+  process.stdout.write("{}");
+  process.exit(0);
+}
 
+// ── Build output ─────────────────────────────────────────
+const parts = [];
+parts.push("[codebrain] Skills auto-suggested based on prompt analysis:");
+for (const i of injected) {
+  parts.push(`  - "${i.skill}" matched: prompt signal (score ${i.score}, phrases: ${i.matchedPhrases.join(", ")})`);
+}
+parts.push("");
+
+for (const i of injected) {
+  parts.push(`--- codebrain:${i.skill} ---`);
+  parts.push(i.content);
+  parts.push(`--- end codebrain:${i.skill} ---`);
   parts.push("");
-
-  // Full skill content
-  for (const i of injected) {
-    parts.push(`--- codebrain:${i.skill} ---`);
-    parts.push(i.content);
-    parts.push(`--- end codebrain:${i.skill} ---`);
-    parts.push("");
-  }
-
-  // Summary references
-  for (const s of summaryOnly) {
-    parts.push(s.summary);
-  }
-
-  // Metadata
-  const meta = {
-    version: 1,
-    hookEvent: "UserPromptSubmit",
-    matchedSkills: matches.map(m => m.skill),
-    injectedSkills: injected.map(i => i.skill),
-    summaryOnly: summaryOnly.map(s => s.skill),
-  };
-  parts.push(`<!-- codebrain:promptInjection: ${JSON.stringify(meta)} -->`);
-
-  writeHookOutput(parts.join("\n"));
 }
 
-function buildSkillContent(name, skill) {
-  const header = `# codebrain:${name}\n\nInvoke with: /codebrain:${name}\n\n`;
-  return header + (skill.body || "");
+for (const s of summaryOnly) {
+  parts.push(s.summary);
 }
 
-// ── Run ──────────────────────────────────────────────────
-main().catch(() => writeHookOutput(null));
+const meta = { version: 1, hookEvent: "UserPromptSubmit", matchedSkills: matches.map(m => m.skill), injectedSkills: injected.map(i => i.skill), summaryOnly: summaryOnly.map(s => s.skill) };
+parts.push(`<!-- codebrain:promptInjection: ${JSON.stringify(meta)} -->`);
+
+process.stdout.write(JSON.stringify({ hookSpecificOutput: { additionalContext: parts.join("\n") } }));
+process.exit(0);

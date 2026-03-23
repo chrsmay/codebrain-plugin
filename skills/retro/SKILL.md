@@ -167,10 +167,55 @@ Ask the user these questions ONE AT A TIME:
 ### Step 6: Persist & Integrate
 
 - Save to `.codebrain/epics/{slug}/retro.md` via MCP tools
-- If Linear MCP is available:
-  - Create Linear issues for "Next Iteration Plan" items
-  - Tag them with the epic label
-  - Close the epic's milestone
+
+### Step 6b: Linear Sync (when linearSync is enabled)
+
+Read `.codebrain/config.json` for `linearSync` and `linearProjectId`.
+
+If Linear sync is active:
+
+1. **Create a Linear project update** (retrospective summary):
+   - Health status: `onTrack` if scope metrics ≥ 80% shipped, `atRisk` if 50-80%, `offTrack` if < 50%
+   - Body (markdown):
+     ```markdown
+     ## Retrospective — [date]
+
+     ### Metrics
+     | Metric | Value |
+     |--------|-------|
+     | Planned scope | [N tickets] |
+     | Shipped | [N tickets] |
+     | Cut | [N tickets] |
+     | Deferred | [N tickets] |
+     | Appetite | [X hours] |
+     | Actual | [Y hours] |
+
+     ### What Went Well
+     [key wins]
+
+     ### What Didn't
+     [key issues]
+
+     ### Process Improvements
+     [changes for future features]
+     ```
+
+2. **Gather metrics from Linear** (not just local files):
+   - Call `list_issues` for the project to count: Done, Cancelled, Backlog
+   - This gives accurate scope metrics even if local files are stale
+
+3. **Create "Next Iteration" issues:**
+   - For each "Now" item: call `create_issue` with priority 1 (Urgent), label `next-iteration`
+   - For each "Next" item: call `create_issue` with priority 2 (High), label `next-iteration`
+   - For each "Later" item: call `create_issue` with priority 4 (Low), label `backlog`
+
+4. **Close the current project** (or mark as completed):
+   - Call `update_project` to set status to "Completed"
+   - This archives the epic in Linear while preserving all history
+
+5. **Store the retro as a project document:**
+   - Create a Linear project document with the full retrospective
+   - This preserves learnings alongside the project's PRD, specs, and launch report
 
 ### Step 7: Next Cycle
 

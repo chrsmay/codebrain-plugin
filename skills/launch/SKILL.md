@@ -201,10 +201,55 @@ Compare against the Definition of Done from the epic/plan:
 ### Step 6: Persist & Integrate
 
 - Save to `.codebrain/epics/{slug}/launch-report.md` via MCP tools
-- If Linear MCP is available:
-  - Create Linear issues for any blockers
-  - Mark the epic's milestone as "Launch Ready" or "Blocked"
-  - Add the rollout plan to the project description
+
+### Step 6b: Linear Sync (when linearSync is enabled)
+
+Read `.codebrain/config.json` for `linearSync` and `linearProjectId`.
+
+If Linear sync is active:
+
+1. **Create a Linear project update** with health status:
+   - Call the project update tool with:
+     - **Health**: `onTrack` if all checks pass, `atRisk` if warnings exist, `offTrack` if blockers found
+     - **Body** (markdown):
+       ```markdown
+       ## Pre-Launch Report — [date]
+
+       ### Summary
+       - Blockers: [count]
+       - Warnings: [count]
+       - Checks Passed: [count]/[total]
+
+       ### Checklist Results
+       | Category | Pass | Fail | Skip |
+       |----------|------|------|------|
+       | Performance | X | X | X |
+       | Security | X | X | X |
+       | Accessibility | X | X | X |
+       | Error Handling | X | X | X |
+       | Testing | X | X | X |
+       | Documentation | X | X | X |
+       | Monitoring | X | X | X |
+
+       ### Rollout Plan
+       [Phase 1-5 summary]
+
+       ### Blockers (must resolve before launch)
+       [list]
+       ```
+
+2. **Create Linear issues for blockers:**
+   - For each blocker found in the pre-launch checklist:
+     - Call `create_issue` with priority 1 (Urgent), label `blocker`, `launch-gate`
+     - Set it as blocking the epic's parent issue
+
+3. **Update project milestone:**
+   - If all checks pass: update milestone to "Launch Ready"
+   - If blockers exist: update milestone to "Blocked — [count] blockers"
+
+4. **Store the rollout plan as a project document:**
+   - Create a Linear project document with the full rollout plan
+   - This ensures the rollout plan is accessible during the actual deployment
 
 ## Rules
 
