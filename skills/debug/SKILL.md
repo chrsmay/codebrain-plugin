@@ -1,6 +1,61 @@
 ---
 name: debug
 description: "Use when something is broken, failing, hanging, erroring, or behaving unexpectedly. Systematic debugging workflow: reproduce → isolate → hypothesize → fix → verify. Prevents guessing and shotgun fixes. Also triggers on frustration signals like 'why isn't this working', 'it's broken', 'stuck'."
+metadata:
+  priority: 8
+  pathPatterns:
+    - "**/*.log"
+    - "**/error.ts"
+    - "**/error.tsx"
+    - "**/error.js"
+    - "**/error.jsx"
+    - "**/__tests__/**"
+    - "**/*.test.ts"
+    - "**/*.test.tsx"
+    - "**/*.spec.ts"
+    - "**/*.spec.tsx"
+  bashPatterns:
+    - "\\bnpm\\s+test\\b"
+    - "\\bpnpm\\s+test\\b"
+    - "\\bpytest\\b"
+    - "\\bcurl\\s+-[vI]"
+    - "\\btail\\s+-f\\b"
+    - "\\bnode\\s+--inspect\\b"
+  promptSignals:
+    phrases:
+      - "why is this failing"
+      - "it's broken"
+      - "not working"
+      - "getting an error"
+      - "bug in"
+      - "debug this"
+      - "fix this bug"
+      - "stack trace"
+      - "error message"
+      - "unexpected behavior"
+      - "something went wrong"
+      - "TypeError"
+      - "null reference"
+      - "investigate this issue"
+    allOf:
+      - [fix, bug]
+      - [debug, issue]
+      - [not, working]
+      - [error, when]
+    anyOf:
+      - "bug"
+      - "error"
+      - "debug"
+      - "failing"
+      - "broken"
+      - "crash"
+    noneOf:
+      - "write a test"
+      - "add test coverage"
+  chainTo:
+    - pattern: "Error:|TypeError:|ReferenceError:|SyntaxError:"
+      targetSkill: verify
+      message: "Error detected - verify the fix after debugging"
 ---
 
 # CodeBrain Debug

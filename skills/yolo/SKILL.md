@@ -1,6 +1,36 @@
 ---
 name: yolo
 description: "Use when you want fully automated Plan → Execute → Verify with auto-commit. Uses task recitation to prevent drift, circuit breakers for safety, and fresh context per task. Pauses on Critical issues and unresolved [NEEDS CLARIFICATION] markers."
+metadata:
+  priority: 7
+  pathPatterns:
+    - ".codebrain/epics/**"
+    - ".codebrain/active/**"
+  promptSignals:
+    phrases:
+      - "just do it"
+      - "yolo mode"
+      - "auto pilot"
+      - "execute everything"
+      - "build this end to end"
+      - "implement and commit"
+      - "ship it"
+      - "make it happen"
+      - "full auto"
+    allOf:
+      - [implement, commit]
+      - [build, ship]
+    anyOf:
+      - "yolo"
+      - "autopilot"
+      - "auto-pilot"
+    noneOf:
+      - "plan only"
+      - "review first"
+  chainTo:
+    - pattern: "## Committed:|## Implementation Complete"
+      targetSkill: verify
+      message: "Auto-implementation complete - verify result"
 ---
 
 # CodeBrain YOLO

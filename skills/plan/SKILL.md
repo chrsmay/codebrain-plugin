@@ -1,6 +1,44 @@
 ---
 name: plan
 description: "Use when implementing a feature, fixing a bug, refactoring, or making any code change. Generates a structured plan with EARS criteria and [NEEDS CLARIFICATION] markers, executes it, then auto-verifies with spec reconciliation. The core Plan → Execute → Verify loop."
+metadata:
+  priority: 8
+  pathPatterns:
+    - ".codebrain/epics/**"
+    - ".codebrain/active/**"
+    - "**/PLAN.md"
+    - "**/TODO.md"
+    - "**/IMPLEMENTATION.md"
+  bashPatterns:
+    - "\\bgit\\s+checkout\\s+-b\\b"
+    - "\\bgit\\s+branch\\b"
+  promptSignals:
+    phrases:
+      - "plan the implementation"
+      - "implementation plan"
+      - "how should we implement"
+      - "break this down"
+      - "what's the approach"
+      - "step by step plan"
+      - "plan this feature"
+      - "how would you architect"
+      - "what files need to change"
+    allOf:
+      - [plan, implement]
+      - [break, down]
+      - [design, approach]
+    anyOf:
+      - "plan"
+      - "approach"
+      - "strategy"
+      - "architect"
+    noneOf:
+      - "execute the plan"
+      - "run the plan"
+  chainTo:
+    - pattern: "## Implementation Steps|## File Changes|## Plan Complete"
+      targetSkill: verify
+      message: "Plan created - verify against requirements after implementation"
 ---
 
 # CodeBrain Plan

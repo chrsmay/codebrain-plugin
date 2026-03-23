@@ -1,6 +1,36 @@
 ---
 name: map-journeys
 description: "Use after /codebrain:prd to enumerate ALL user paths through a feature — happy paths, sad paths, edge cases, and error states. Uses state machine modeling to make impossible states impossible. Generates Mermaid diagrams. Runs a pre-mortem to catch failure modes before coding. The MVP hell killer."
+metadata:
+  priority: 5
+  pathPatterns:
+    - ".codebrain/epics/**"
+  promptSignals:
+    phrases:
+      - "map the user journey"
+      - "user flow"
+      - "user path"
+      - "state machine"
+      - "flow diagram"
+      - "how does the user"
+      - "edge cases"
+      - "happy path"
+      - "sad path"
+    allOf:
+      - [user, journey]
+      - [user, flow]
+      - [state, machine]
+    anyOf:
+      - "journey"
+      - "flow"
+      - "user path"
+    noneOf:
+      - "git flow"
+      - "data flow"
+  chainTo:
+    - pattern: "## Journey Map|## State Machine|## Journeys Complete"
+      targetSkill: epic
+      message: "Journeys mapped - create epic with tickets"
 ---
 
 # CodeBrain Map Journeys

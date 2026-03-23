@@ -1,6 +1,30 @@
 ---
 name: analyze
 description: "Use when checking for stale artifacts, spec-code divergence, missing requirements, inconsistencies between specs and implementation, or cross-artifact conflicts. Detects drift, staleness, and gaps across all codebrain artifacts."
+metadata:
+  priority: 5
+  pathPatterns:
+    - ".codebrain/epics/**"
+    - ".codebrain/exports/**"
+    - ".codebrain/active/**"
+  promptSignals:
+    phrases:
+      - "cross check the artifacts"
+      - "consistency check"
+      - "are these aligned"
+      - "do these match"
+      - "analyze for gaps"
+      - "find inconsistencies"
+      - "spec drift"
+    allOf:
+      - [check, consistency]
+      - [analyze, artifacts]
+    anyOf:
+      - "analyze"
+      - "consistency"
+      - "alignment"
+      - "drift"
+    noneOf: []
 ---
 
 # CodeBrain Analyze

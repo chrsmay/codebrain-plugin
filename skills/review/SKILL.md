@@ -1,6 +1,40 @@
 ---
 name: review
 description: "Use when reviewing code for bugs, performance issues, security vulnerabilities, or quality problems. Deep agentic review that reads full files and traces imports, not just diffs. Categorizes by severity."
+metadata:
+  priority: 5
+  pathPatterns:
+    - "**/*.ts"
+    - "**/*.tsx"
+    - "**/*.js"
+    - "**/*.jsx"
+    - "**/*.py"
+    - "**/*.rs"
+    - "**/*.go"
+  bashPatterns:
+    - "\\bgit\\s+diff\\b"
+    - "\\bgit\\s+log\\s+--oneline\\b"
+  promptSignals:
+    phrases:
+      - "review this code"
+      - "code review"
+      - "review my changes"
+      - "any issues with this"
+      - "review the pr"
+      - "pull request review"
+      - "check this code"
+      - "look at this code"
+    allOf:
+      - [review, code]
+      - [review, changes]
+      - [check, code, quality]
+    anyOf:
+      - "review"
+      - "code review"
+      - "PR"
+    noneOf:
+      - "design review"
+      - "spec review"
 ---
 
 # CodeBrain Review
@@ -65,3 +99,79 @@ Agentic code review with severity ratings. Reviews full files (not just diffs), 
 - **Traces imports** — reads referenced modules to verify API contracts
 - Checks against **project conventions** — catches style/pattern violations
 - Categories are **actionable** — Bug/Performance/Security/Clarity, not vague "suggestion"
+
+## Review Checklist
+
+### Component Structure
+- [ ] One component per file (with co-located helpers)
+- [ ] Named exports preferred over default exports
+- [ ] Props interface defined with TypeScript
+- [ ] Props destructured in function signature
+- [ ] Component name matches file name
+
+### Hooks & State
+- [ ] Hooks called at top level (not in conditionals/loops)
+- [ ] Custom hooks extract reusable logic
+- [ ] Dependency arrays are complete and correct
+- [ ] useCallback/useMemo used for expensive computations, not everywhere
+- [ ] No state synchronization (derive, don't sync)
+
+### Accessibility
+- [ ] Semantic HTML elements used (button, nav, main, not div for everything)
+- [ ] Alt text on images
+- [ ] Keyboard navigation works
+- [ ] ARIA attributes where needed
+- [ ] Form labels associated with inputs
+
+### Performance
+- [ ] No inline object/array literals in JSX props
+- [ ] Lists have stable keys (not array index)
+- [ ] Large lists use virtualization
+- [ ] Images use next/image or equivalent
+- [ ] No unnecessary re-renders from parent state changes
+
+### Security
+- [ ] No dangerouslySetInnerHTML without sanitization
+- [ ] User input validated before use
+- [ ] No secrets in client-side code
+- [ ] SQL/NoSQL queries parameterized
+- [ ] API routes check authentication/authorization
+
+### TypeScript
+- [ ] No `any` types (use `unknown` if truly unknown)
+- [ ] Return types on exported functions
+- [ ] Discriminated unions for complex state
+- [ ] `as const` for literal types
+
+## Review Report Template
+
+```markdown
+# Code Review Report
+
+**Scope:** [files reviewed]
+**Date:** [ISO date]
+**Branch:** [branch name]
+
+## Summary
+| Category | Critical | Major | Minor |
+|----------|----------|-------|-------|
+| Bug | 0 | 0 | 0 |
+| Performance | 0 | 0 | 0 |
+| Security | 0 | 0 | 0 |
+| Clarity | 0 | 0 | 0 |
+
+## Findings
+
+### Critical
+_None_
+
+### Major
+| # | Category | File:Line | Description | Fix |
+|---|----------|-----------|-------------|-----|
+| 1 | Bug | src/api.ts:42 | ... | ... |
+
+### Minor
+| # | Category | File:Line | Description | Fix |
+|---|----------|-----------|-------------|-----|
+| 1 | Clarity | src/utils.ts:15 | ... | ... |
+```

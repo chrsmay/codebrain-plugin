@@ -1,6 +1,36 @@
 ---
 name: design
 description: "Use when creating UI mockups, wireframes, design systems, or visual prototypes before implementing frontend code. Uses Pencil.dev MCP to create designs in .pen files, validate visually with screenshots, then generate code from approved designs. Design-first workflow for UI features."
+metadata:
+  priority: 4
+  pathPatterns:
+    - "**/*.pen"
+    - "**/design/**"
+    - "**/mockup*"
+    - "**/wireframe*"
+  promptSignals:
+    phrases:
+      - "design the ui"
+      - "mockup"
+      - "wireframe"
+      - "ui design"
+      - "design a screen"
+      - "what should it look like"
+      - "visual design"
+    allOf:
+      - [design, ui]
+      - [create, mockup]
+    anyOf:
+      - "design"
+      - "mockup"
+      - "wireframe"
+    noneOf:
+      - "system design"
+      - "architecture design"
+  chainTo:
+    - pattern: "## Design Complete|## Mockup Ready"
+      targetSkill: prd
+      message: "Design ready - document requirements"
 ---
 
 # CodeBrain Design

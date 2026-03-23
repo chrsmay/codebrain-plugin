@@ -1,6 +1,38 @@
 ---
 name: prd
 description: "Use after /codebrain:discover to write a Product Requirements Document. Generates a structured PRD (<1200 words) with P0/P1/P2 requirements, user stories, success metrics, and non-goals. Validates against anti-patterns. Every P0 requirement traces to a user need. Outputs machine-readable acceptance criteria for AI agents."
+metadata:
+  priority: 7
+  pathPatterns:
+    - ".codebrain/epics/**"
+    - "**/PRD.md"
+    - "**/REQUIREMENTS.md"
+    - "**/SPEC.md"
+  promptSignals:
+    phrases:
+      - "write a prd"
+      - "product requirements"
+      - "requirements document"
+      - "define the requirements"
+      - "spec this out"
+      - "write the spec"
+      - "acceptance criteria"
+      - "user stories"
+    allOf:
+      - [product, requirements]
+      - [write, spec]
+      - [acceptance, criteria]
+    anyOf:
+      - "prd"
+      - "requirements"
+      - "specification"
+    noneOf:
+      - "implement"
+      - "code this"
+  chainTo:
+    - pattern: "## Requirements|## Acceptance Criteria|## User Stories"
+      targetSkill: map-journeys
+      message: "PRD created - map user journeys next"
 ---
 
 # CodeBrain PRD

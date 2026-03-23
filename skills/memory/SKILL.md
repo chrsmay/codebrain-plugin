@@ -1,6 +1,38 @@
 ---
 name: memory
 description: "Use when initializing a project for codebrain, loading project context, updating memory after work, or resetting project knowledge. Subcommands: reset (initialize .codebrain/ with constitution), load (display memory), update (refresh from recent work)."
+metadata:
+  priority: 9
+  pathPatterns:
+    - ".codebrain/**"
+    - ".codebrain/memory/**"
+    - ".codebrain/epics/**"
+    - ".codebrain/exports/**"
+  bashPatterns:
+    - "\\bgit\\s+log\\b.*--since"
+    - "\\bgit\\s+diff\\b.*HEAD"
+  promptSignals:
+    phrases:
+      - "what do you remember"
+      - "what do you know about this project"
+      - "project context"
+      - "save this for later"
+      - "remember this"
+      - "what changed since"
+      - "bring me up to speed"
+      - "project history"
+      - "what was decided"
+      - "initialize codebrain"
+    allOf:
+      - [remember, project]
+      - [context, project]
+      - [save, memory]
+    anyOf:
+      - "memory"
+      - "context"
+      - "history"
+      - "remember"
+    noneOf: []
 ---
 
 # CodeBrain Memory

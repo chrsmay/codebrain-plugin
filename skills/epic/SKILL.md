@@ -1,6 +1,36 @@
 ---
 name: epic
 description: "Use when starting a large feature, managing multi-ticket work, or tracking specs/tickets/decisions. Subcommands: create (specs + tickets with EARS requirements and Given/When/Then acceptance criteria), work (next ticket), status (progress)."
+metadata:
+  priority: 7
+  pathPatterns:
+    - ".codebrain/epics/**"
+    - "**/EPIC.md"
+  bashPatterns:
+    - "\\bgit\\s+branch\\b.*epic"
+    - "\\bgit\\s+branch\\b.*feature"
+  promptSignals:
+    phrases:
+      - "create an epic"
+      - "new epic"
+      - "epic for"
+      - "start a new feature"
+      - "break into tickets"
+      - "ticket breakdown"
+      - "create tickets"
+      - "manage this work"
+    allOf:
+      - [create, epic]
+      - [break, tickets]
+    anyOf:
+      - "epic"
+      - "tickets"
+      - "multi-ticket"
+    noneOf: []
+  chainTo:
+    - pattern: "## Tickets|## Breakdown|## Epic Created"
+      targetSkill: plan
+      message: "Epic tickets created - plan implementation"
 ---
 
 # CodeBrain Epic

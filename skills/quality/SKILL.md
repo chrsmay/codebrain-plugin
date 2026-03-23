@@ -1,6 +1,47 @@
 ---
 name: quality
 description: "Use when scanning for dead code, unused imports, stub functions, duplicate logic, or general code quality issues. Runs automated detection tools and AI-powered analysis to find problems that linters miss."
+metadata:
+  priority: 5
+  pathPatterns:
+    - "**/*.ts"
+    - "**/*.tsx"
+    - "**/*.js"
+    - "**/*.jsx"
+    - "**/*.py"
+  bashPatterns:
+    - "\\bnpm\\s+run\\s+lint\\b"
+    - "\\beslint\\b"
+    - "\\bruff\\b"
+    - "\\bpylint\\b"
+    - "\\bknip\\b"
+  promptSignals:
+    phrases:
+      - "dead code"
+      - "unused imports"
+      - "code quality"
+      - "duplicated code"
+      - "find stubs"
+      - "clean up unused"
+      - "code coverage"
+      - "tech debt"
+      - "technical debt"
+      - "code smell"
+    allOf:
+      - [dead, code]
+      - [unused, code]
+      - [code, quality]
+    anyOf:
+      - "quality"
+      - "dead code"
+      - "unused"
+      - "duplication"
+      - "tech debt"
+    noneOf: []
+  chainTo:
+    - pattern: "## Dead Code Found|## Quality Issues|## Findings"
+      targetSkill: refactor
+      message: "Quality issues found - refactor to fix"
 ---
 
 # CodeBrain Quality
@@ -67,3 +108,54 @@ Codebase quality scan for dead code, unused imports, stubs, duplicates, and tech
 7. **If cleaning:** remove safe items, then run build/test to confirm nothing broke.
 
 8. **Persist report** to `.codebrain/reviews/{date}-quality-scan.md`.
+
+## Quality Report Template
+
+```markdown
+# Quality Scan Report
+
+**Scope:** [path or "full project"]
+**Date:** [ISO date]
+**Stack:** [auto-detected]
+
+## Summary
+| Category | Count | Severity |
+|----------|-------|----------|
+| Dead Code | 0 | Minor |
+| Stubs | 0 | Major |
+| Duplicates | 0 | Minor |
+| Unused Dependencies | 0 | Minor |
+| Low Coverage Files | 0 | Major |
+| Unsafe Dependencies | 0 | Critical |
+
+## Automated Tool Results
+| Tool | Status | Output |
+|------|--------|--------|
+| ESLint | PASS/FAIL | [error count] |
+| TypeScript | PASS/FAIL | [error count] |
+| Knip/Ruff | PASS/FAIL | [unused count] |
+| Coverage | N% | [threshold: 80%] |
+| Socket | SAFE/WARN | [flagged count] |
+
+## Findings
+
+### Dead Code
+| # | File:Line | Type | Description | Safe to Remove |
+|---|-----------|------|-------------|----------------|
+| 1 | src/old.ts:1-45 | Unused export | `formatLegacy()` has 0 callers | Yes |
+
+### Stubs
+| # | File:Line | Description |
+|---|-----------|-------------|
+| 1 | src/api.ts:88 | `throw new Error("not implemented")` |
+
+### Duplicates
+| # | File A | File B | Lines | Similarity |
+|---|--------|--------|-------|------------|
+| 1 | utils/format.ts:10-25 | helpers/fmt.ts:5-20 | 15 | 92% |
+
+## Cleanup Classification
+- **Safe (auto-removable):** unused imports, unreferenced exports, empty files
+- **Needs Review:** stubs (may be intentional placeholders), low-coverage files
+- **Manual Only:** duplicates (need architectural decision), unsafe deps (need replacement)
+```

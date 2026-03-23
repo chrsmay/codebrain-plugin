@@ -1,6 +1,45 @@
 ---
 name: refactor
 description: "Use when restructuring code without changing behavior — extracting functions, splitting files, renaming, reorganizing modules, reducing complexity, or cleaning up debt. Ensures behavior is preserved through snapshot testing before and after. Not for bug fixes or features."
+metadata:
+  priority: 6
+  pathPatterns:
+    - "**/*.ts"
+    - "**/*.tsx"
+    - "**/*.js"
+    - "**/*.jsx"
+    - "**/*.py"
+    - "**/*.rs"
+    - "**/*.go"
+  bashPatterns:
+    - "\\bgit\\s+diff\\s+--stat\\b"
+    - "\\bnpm\\s+run\\s+lint\\b"
+  promptSignals:
+    phrases:
+      - "refactor this"
+      - "clean up this code"
+      - "restructure"
+      - "extract component"
+      - "reduce duplication"
+      - "simplify this"
+      - "modularize"
+      - "technical debt"
+    allOf:
+      - [refactor, code]
+      - [clean, up]
+      - [reduce, duplication]
+    anyOf:
+      - "refactor"
+      - "restructure"
+      - "simplify"
+      - "tech debt"
+    noneOf:
+      - "new feature"
+      - "add functionality"
+  chainTo:
+    - pattern: "## Refactoring Complete|## Changes Summary"
+      targetSkill: verify
+      message: "Refactoring done - verify nothing broke"
 ---
 
 # CodeBrain Refactor

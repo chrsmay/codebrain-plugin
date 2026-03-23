@@ -1,6 +1,50 @@
 ---
 name: launch
 description: "Use when a feature is implemented and verified but not yet shipped. Generates a stack-aware pre-launch checklist covering performance, security, accessibility, error handling, monitoring, and rollback. Validates Definition of Done. Creates a rollout plan with feature flags. Prevents shipping broken features."
+metadata:
+  priority: 6
+  pathPatterns:
+    - "**/Dockerfile"
+    - "**/docker-compose.yml"
+    - "**/docker-compose.yaml"
+    - "**/.github/workflows/**"
+    - "**/vercel.json"
+    - "**/netlify.toml"
+    - "**/CHANGELOG.md"
+    - "**/RELEASE.md"
+  bashPatterns:
+    - "\\bnpm\\s+run\\s+build\\b"
+    - "\\bvercel\\s+deploy\\b"
+    - "\\bdocker\\s+build\\b"
+    - "\\bgit\\s+tag\\b"
+    - "\\bnpm\\s+publish\\b"
+  promptSignals:
+    phrases:
+      - "ready to launch"
+      - "deploy this"
+      - "go to production"
+      - "release checklist"
+      - "pre-launch"
+      - "ship to prod"
+      - "rollout plan"
+      - "deployment plan"
+      - "ship it"
+    allOf:
+      - [ready, deploy]
+      - [launch, production]
+      - [ship, prod]
+    anyOf:
+      - "launch"
+      - "deploy"
+      - "release"
+      - "production"
+    noneOf:
+      - "staging"
+      - "dev server"
+  chainTo:
+    - pattern: "## Launch Complete|## Deployed|## Rollout Complete"
+      targetSkill: retro
+      message: "Launch complete - run retrospective"
 ---
 
 # CodeBrain Launch

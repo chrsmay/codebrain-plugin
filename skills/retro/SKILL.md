@@ -1,6 +1,35 @@
 ---
 name: retro
 description: "Use after shipping a feature to run a structured retrospective. Gathers metrics (what shipped, what was cut, time spent), identifies what went well and what didn't, updates the PRD with learnings, and plans the next iteration. Prevents 'ship once and forget' — the root cause of MVP hell."
+metadata:
+  priority: 4
+  pathPatterns:
+    - ".codebrain/epics/**"
+    - "**/RETRO.md"
+    - "**/RETROSPECTIVE.md"
+  bashPatterns:
+    - "\\bgit\\s+log\\s+--oneline\\b"
+  promptSignals:
+    phrases:
+      - "retrospective"
+      - "what went well"
+      - "what could improve"
+      - "lessons learned"
+      - "post mortem"
+      - "sprint review"
+    allOf:
+      - [what, went, well]
+      - [lessons, learned]
+    anyOf:
+      - "retro"
+      - "retrospective"
+      - "lessons"
+      - "post mortem"
+    noneOf: []
+  chainTo:
+    - pattern: "## Action Items|## Next Iteration"
+      targetSkill: discover
+      message: "Retro complete - discover next iteration scope"
 ---
 
 # CodeBrain Retro

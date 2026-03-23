@@ -1,6 +1,36 @@
 ---
 name: discover
 description: "Use BEFORE writing a PRD. Structured problem discovery that validates whether a feature is worth building. Asks who has the problem, how painful it is, what alternatives exist, and what success looks like. Outputs an opportunity statement. Prevents building things nobody wants."
+metadata:
+  priority: 6
+  pathPatterns:
+    - "**/README.md"
+    - "**/package.json"
+    - "**/pyproject.toml"
+    - "**/Cargo.toml"
+  promptSignals:
+    phrases:
+      - "is this feasible"
+      - "can we build"
+      - "feasibility"
+      - "what would it take"
+      - "explore this idea"
+      - "is this possible"
+      - "scope this out"
+      - "worth building"
+    allOf:
+      - [feasible, build]
+      - [possible, implement]
+    anyOf:
+      - "feasibility"
+      - "explore"
+      - "scope"
+      - "assess"
+    noneOf: []
+  chainTo:
+    - pattern: "## Feasibility: GO|## Recommendation: Proceed|## Opportunity Statement"
+      targetSkill: prd
+      message: "Feasibility confirmed - write PRD"
 ---
 
 # CodeBrain Discover

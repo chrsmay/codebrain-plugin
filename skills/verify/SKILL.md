@@ -1,6 +1,55 @@
 ---
 name: verify
 description: "Use when checking if implementation matches a plan or spec, after completing code changes, before claiming work is done, or when you need to run build/test/lint checks. Checks EARS acceptance criteria, runs automated checks, detects spec deviations, categorizes issues by severity."
+metadata:
+  priority: 7
+  pathPatterns:
+    - ".codebrain/epics/**"
+    - ".codebrain/active/**"
+    - "**/*.test.ts"
+    - "**/*.test.tsx"
+    - "**/*.test.js"
+    - "**/*.test.jsx"
+    - "**/*.spec.ts"
+    - "**/*.spec.tsx"
+    - "**/*.spec.js"
+    - "**/*.spec.jsx"
+  bashPatterns:
+    - "\\bnpm\\s+run\\s+build\\b"
+    - "\\bnpm\\s+run\\s+test\\b"
+    - "\\bpnpm\\s+(run\\s+)?test\\b"
+    - "\\btsc\\s+--noEmit\\b"
+    - "\\bpytest\\b"
+    - "\\bnpm\\s+run\\s+lint\\b"
+  promptSignals:
+    phrases:
+      - "verify this works"
+      - "does this meet the spec"
+      - "check against requirements"
+      - "validate the implementation"
+      - "does this match the prd"
+      - "is this correct"
+      - "is it done"
+      - "ready to ship"
+      - "spec compliance"
+    allOf:
+      - [verify, spec]
+      - [check, requirements]
+      - [validate, implementation]
+    anyOf:
+      - "verify"
+      - "validate"
+      - "compliance"
+    noneOf:
+      - "write test"
+      - "add test"
+  chainTo:
+    - pattern: "## Verification: PASS|Verdict.*PASS|All checks passed"
+      targetSkill: launch
+      message: "Verification passed - prepare for launch"
+    - pattern: "## Verification: FAIL|CRITICAL:|BLOCKER:|Verdict.*FAIL"
+      targetSkill: debug
+      message: "Verification failed - debug the issues"
 ---
 
 # CodeBrain Verify
