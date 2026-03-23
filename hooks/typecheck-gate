@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# CodeBrain PostToolUse hook — lightweight type-check gate
+# Runs async after every Write/Edit. Non-blocking — only warns.
+# Checks ONLY the modified file, not the entire project.
+
+# Read the tool input from stdin to get the file path
+INPUT=$(cat)
+FILE_PATH=$(echo "$INPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('tool_input',{}).get('file_path',''))" 2>/dev/null)
+
+if [ -z "$FILE_PATH" ]; then
+  exit 0
+fi
+
+# Determine file extension
+EXT="${FILE_PATH##*.}"
+WARNINGS=""
+
+case "$EXT" in
+  ts|tsx)
+    # TypeScript: check for type errors in this specific file
+    if command -v npx &>/dev/null && [ -f "tsconfig.json" ]; then
+      ERRORS=$(npx tsc --noEmit --pretty false 2>&1 | grep -c "error TS" || true)
+      if [ "$ERRORS" -gt 0 ]; then
+        # Get just the errors related to the modified file
+        FILE_ERRORS=$(npx tsc --noEmit --pretty false 2>&1 | grep "$(basename "$FILE_PATH")" | head -5)
+        if [ -n "$FILE_ERRORS" ]; then
+          WARNINGS="[codebrain typecheck] TypeScript errors detected in modified file:
+$FILE_ERRORS"
+        fi
+      fi
+    fi
+    ;;
+  py)
+    # Python: check with ruff for quick syntax/import errors
+    if command -v ruff &>/dev/null; then
+      RUFF_OUT=$(ruff check --select E,F "$FILE_PATH" 2>&1 | head -5)
+      if [ -n "$RUFF_OUT" ] && [ "$RUFF_OUT" != "All checks passed!" ]; then
+        WARNINGS="[codebrain typecheck] Python issues detected:
+$RUFF_OUT"
+      fi
+    fi
+    ;;
+esac
+
+if [ -n "$WARNINGS" ]; then
+  # Escape for JSON
+  json_warnings=$(echo "$WARNINGS" | python3 -c "import sys,json; print(json.dumps(sys.stdin.read()))" 2>/dev/null || echo "\"Type errors detected in modified file\"")
+  printf '{"hookSpecificOutput":{"additionalContext":%s}}' "$json_warnings"
+else
+  # No issues — silent
+  printf '{}'
+fi

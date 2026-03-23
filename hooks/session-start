@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# CodeBrain SessionStart hook
+# Loads project memory context into the Claude Code session.
+
+CODEBRAIN_DIR=""
+
+# Walk up from cwd to find .codebrain/
+dir="$(pwd)"
+while [ "$dir" != "/" ]; do
+  if [ -d "$dir/.codebrain" ]; then
+    CODEBRAIN_DIR="$dir/.codebrain"
+    break
+  fi
+  dir="$(dirname "$dir")"
+done
+
+if [ -z "$CODEBRAIN_DIR" ]; then
+  # No .codebrain found — suggest initialization
+  context="[codebrain] No .codebrain/ directory found in this project. Run /codebrain:memory reset to initialize."
+  printf '{"hookSpecificOutput":{"additionalContext":"%s"}}' "$(echo "$context" | sed 's/"/\\"/g')"
+  exit 0
+fi
+
+# Read continuity (most important for session context)
+context=""
+
+if [ -f "$CODEBRAIN_DIR/memory/continuity.md" ]; then
+  continuity=$(cat "$CODEBRAIN_DIR/memory/continuity.md" 2>/dev/null || echo "")
+  if [ -n "$continuity" ] && [ "$continuity" != "# Continuity
+
+_No entries yet._" ]; then
+    context="[codebrain] Project memory loaded from .codebrain/memory/continuity.md:
+$continuity"
+  fi
+fi
+
+# Read known issues (brief)
+if [ -f "$CODEBRAIN_DIR/memory/known-issues.md" ]; then
+  issues=$(cat "$CODEBRAIN_DIR/memory/known-issues.md" 2>/dev/null || echo "")
+  if [ -n "$issues" ] && [ "$issues" != "# Known issues
+
+_No entries yet._" ]; then
+    context="$context
+
+[codebrain] Known issues:
+$issues"
+  fi
+fi
+
+# Add available commands reminder
+if [ -n "$context" ]; then
+  context="$context
+
+[codebrain] Available commands: /codebrain:plan, /codebrain:epic, /codebrain:review, /codebrain:verify, /codebrain:yolo, /codebrain:quality, /codebrain:memory"
+else
+  context="[codebrain] .codebrain/ exists but memory is empty. Run /codebrain:memory reset to initialize project context.
+Available commands: /codebrain:plan, /codebrain:epic, /codebrain:review, /codebrain:verify, /codebrain:yolo, /codebrain:quality, /codebrain:memory"
+fi
+
+# Escape for JSON output
+json_context=$(echo "$context" | python3 -c "import sys,json; print(json.dumps(sys.stdin.read()))" 2>/dev/null || echo "\"$context\"")
+
+printf '{"hookSpecificOutput":{"additionalContext":%s}}' "$json_context"

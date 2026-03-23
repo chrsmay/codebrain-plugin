@@ -1,0 +1,40 @@
+{
+  "mcpServers": {
+    "codebrain": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp-server/dist/index.js"]
+    },
+    "codebase-memory": {
+      "command": "npx",
+      "args": ["-y", "codebase-memory-mcp"]
+    },
+    "code-review-graph": {
+      "command": "uvx",
+      "args": ["code-review-graph"]
+    },
+    "eslint": {
+      "command": "npx",
+      "args": ["@eslint/mcp@latest"]
+    },
+    "socket": {
+      "type": "http",
+      "url": "https://mcp.socket.dev/"
+    },
+    "test-coverage": {
+      "command": "npx",
+      "args": ["-y", "test-coverage-mcp"]
+    },
+    "sentry": {
+      "type": "http",
+      "url": "https://mcp.sentry.dev/sse"
+    },
+    "pare": {
+      "command": "npx",
+      "args": ["-y", "@paretools/git"]
+    },
+    "lighthouse": {
+      "command": "npx",
+      "args": ["-y", "@danielsogl/lighthouse-mcp@latest"]
+    }
+  }
+}
