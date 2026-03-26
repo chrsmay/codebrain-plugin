@@ -80,37 +80,54 @@ Spec compliance and code quality verification. Checks implementation against a p
    - Call `mcp__codebrain__codebrain_config_read` to get build/test/lint commands
    - If commands not configured, try to auto-detect from package.json or equivalent
 
-3. **API verification** (if spec references API routes or third-party SDKs):
-   - Spawn `api-researcher` agent to verify:
-     a. Are the correct SDK method signatures used? (check against official docs)
-     b. Are any deprecated methods being called?
-     c. Are HTTP status codes correct? (201 for create, 404 for not found, etc.)
-     d. Is error response format consistent across all endpoints?
-     e. Is authentication handled correctly per the provider's docs?
-   - Feed API researcher's findings into the verifier agent
+### Three-Tier Verification (Stripe Minions Pattern)
 
-4. **Spawn the verifier agent** with:
-   - The full spec/plan text
-   - The constitution text
-   - **API researcher findings** (if step 3 was executed)
-   - Extracted acceptance criteria as a checklist
-   - Instructions to:
-     a. Run build command via Bash (if configured)
-     b. Run test command via Bash (if configured)
-     c. Run ESLint via MCP for structured lint results
-     d. Check test coverage via test-coverage MCP for changed files
-     e. Check dependency safety via Socket + Sonatype MCP for any new packages
-     f. **Check API correctness** — verify against api-researcher's guidance (deprecated methods = Major, wrong status codes = Major, wrong auth = Critical)
-     g. Read each file listed in the spec
-     h. **Check each EARS/Given-When-Then criterion** as PASS/FAIL with file:line evidence
-     i. **Detect spec deviations** — flag where implementation differs from spec:
-        - `[SPEC_DEVIATION]` markers for each divergence
-        - Include: what spec says, what code does, which is correct
-     i. **Check constitution compliance** — flag violations of project principles
-     j. Categorize issues: Critical / Major / Minor
-     k. Output a structured verification report
+Run checks in order of speed and cost. Stop early if fast checks fail.
 
-4. **Present the report.**
+#### Tier 1: Fast Deterministic Checks (<5 seconds)
+Run these BEFORE spawning any agents. These are deterministic — no LLM needed.
+
+3. **Lint check** via ESLint MCP: `mcp__eslint__eslint_lint` on changed files only.
+4. **Type check** via Bash: `npx tsc --noEmit 2>&1 | tail -20` (TypeScript) or `ruff check --select E,F . 2>&1 | tail -20` (Python).
+5. **If Tier 1 fails:** Report lint/type errors immediately. Offer to fix before running expensive checks. Do NOT proceed to Tier 2 until Tier 1 passes (saves time and tokens).
+
+#### Tier 2: Selective Test Execution (10-60 seconds)
+6. **Identify changed files:** `git diff --name-only HEAD` or from the plan's file list.
+7. **Run SELECTIVE tests** — only tests related to changed files:
+   - TypeScript/Jest: `npx jest --findRelatedTests <changed-files> 2>&1 | tail -50`
+   - Python/pytest: `pytest <changed-files-dirs> 2>&1 | tail -50`
+   - If selective test detection is unavailable: run full suite as fallback
+8. **Build check** via Bash: run the project's build command.
+9. **If Tier 2 fails:** Report test/build failures. These are concrete — the agent gets ONE fix attempt (Tier 3).
+
+#### Tier 3: Agentic Analysis (LLM-powered, expensive)
+Only runs AFTER Tier 1 and Tier 2 complete. The agent receives all Tier 1+2 results as input.
+
+10. **API verification** (if spec references API routes or third-party SDKs):
+    - Spawn `api-researcher` agent for official docs verification
+    - Feed findings into the verifier agent
+
+11. **Spawn the verifier agent** with:
+    - The full spec/plan text
+    - The constitution text
+    - **Tier 1 results** (lint/type check output — already passed or agent is fixing)
+    - **Tier 2 results** (test/build output — passed or needs fixing)
+    - **API researcher findings** (if step 10 was executed)
+    - Extracted acceptance criteria as a checklist
+    - Instructions to:
+      a. Check test coverage via test-coverage MCP for changed files
+      b. Check dependency safety via Socket + Sonatype MCP for any new packages
+      c. **Check API correctness** — verify against api-researcher's guidance
+      d. Read each file listed in the spec
+      e. **Check each EARS/Given-When-Then criterion** as PASS/FAIL with file:line evidence
+      f. **Detect spec deviations** — flag where implementation differs from spec
+      g. **Check constitution compliance** — flag violations of project principles
+      h. Categorize issues: Critical / Major / Minor
+      i. Output a structured verification report
+
+**Key principle:** The agent does NOT run build/test/lint — those already ran deterministically. The agent ANALYZES the results and checks semantic correctness that tools can't.
+
+12. **Present the report.**
    - Show verdict: PASS or FAIL
    - Show automated check results (build/test/lint/coverage/deps)
    - Show acceptance criteria results (EARS/Given-When-Then format)
@@ -120,14 +137,14 @@ Spec compliance and code quality verification. Checks implementation against a p
 
 5. **Handle failures.**
    - If Critical or Major issues found, offer:
-     - "Fix all Critical+Major issues" → implement fixes, then re-verify (max 3 cycles)
+     - "Fix all Critical+Major issues" → implement fixes, then re-verify (max 2 cycles)
      - "Fix specific issue" → fix one, re-verify
      - "Dismiss" → accept as-is
    - **For `[SPEC_DEVIATION]` markers** — ask the user:
      - "Update spec to match code" → update the spec artifact
      - "Fix code to match spec" → modify the implementation
      - "Document as intentional" → add to decisions.md with justification
-   - Track fix cycles. After 3 attempts, stop and report remaining issues.
+   - Track fix cycles. After 2 attempts, stop and generate a **handoff summary**: what was completed, what failed, suggested manual fixes. Frame partial completion as a useful starting point, not a failure. (Stripe's Minions cap at 2 retries — diminishing returns beyond that.)
 
 6. **Persist the report.**
    - Call `mcp__codebrain__codebrain_artifact_write` to save to `.codebrain/active/verification.md`
@@ -166,7 +183,7 @@ Spec compliance and code quality verification. Checks implementation against a p
    b. **Update issue status:**
       - If verdict is PASS: call `update_issue` to set status to "Done"
       - If verdict is FAIL (Critical): set status to "In Progress" (needs fix)
-      - If verdict is FAIL after 3 fix cycles: set status to "In Review" (needs human attention)
+      - If verdict is FAIL after 2 fix cycles: set status to "In Review" (needs human attention)
 
    c. **Update spec deviations in Linear:**
       - For each `[SPEC_DEVIATION]` that the user chose to accept:

@@ -46,7 +46,7 @@ Fully automated Plan → Execute → Verify pipeline with drift prevention. Plan
 ## Safety Rails (non-negotiable)
 
 - Git commit after every successful plan+implement+verify cycle
-- Max 3 fix attempts per issue before pausing
+- Max 2 fix attempts per issue before pausing (Stripe Minions pattern: diminishing returns beyond 2)
 - **Critical issues always pause** — never auto-fix Critical
 - **`[NEEDS CLARIFICATION]` markers always pause** — never guess
 - **`[SPEC_DEVIATION]` markers always pause** — user decides spec vs code
@@ -101,7 +101,7 @@ After each task completes, verify checks for `[SPEC_DEVIATION]` markers. Any dev
    - If Major issues: auto-fix if config allows (default: no), else pause
    - If Critical issues: **always pause**
    - If `[SPEC_DEVIATION]` found: **always pause** — user decides
-   - Max 3 fix+verify cycles, then pause
+   - Max 2 fix+verify cycles, then generate **handoff summary** and pause. The summary includes: what was completed, what failed, what the human should manually fix. Partial completion is a useful starting point, not a failure.
 
 5. **Commit.**
    - `git add` changed files (specific files, not `git add .`)
@@ -170,4 +170,4 @@ After each task completes, verify checks for `[SPEC_DEVIATION]` markers. Any dev
 Read from `.codebrain/config.json` under `yolo`:
 - `auto_fix_minor: true` — auto-fix Minor issues without asking
 - `auto_fix_major: false` — pause on Major issues (set true for more aggressive mode)
-- `max_fix_attempts: 3` — max fix+verify cycles before pausing
+- `max_fix_attempts: 2` — max fix+verify cycles before pausing (default reduced from 3 per Stripe Minions pattern)

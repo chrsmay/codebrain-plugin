@@ -163,3 +163,45 @@ Manage persistent project knowledge stored in `.codebrain/memory/`.
 6. **Check for constitution violations** — If recent work violated a principle, add to Complexity Tracking table with justification.
 7. Call `mcp__codebrain__codebrain_memory_update` for each file that changed.
 8. Report what was updated.
+
+## Subcommand: save-pattern (Blueprint Reuse — Stripe Minions Pattern)
+
+Save a successful implementation as a reusable pattern for similar future tasks.
+
+1. **Read the most recent plan** from `.codebrain/active/plan.md`.
+2. **Read the verification report** from `.codebrain/active/verification.md`.
+3. **Confirm the plan succeeded** — only save patterns from verified, passing implementations.
+4. **Ask the user:** "What type of task is this? (e.g., 'new API endpoint', 'new React component', 'database migration', 'dependency upgrade')"
+5. **Extract the pattern:**
+   ```markdown
+   ## Pattern: [task type]
+
+   **Created:** [date]
+   **Source:** [plan file path]
+   **Verified:** Yes — [verification date]
+
+   ### When to Use
+   [Description of tasks this pattern applies to]
+
+   ### File Template
+   | Action | File Pattern | Template |
+   |--------|-------------|----------|
+   | Create | [path pattern] | [description of what goes in the file] |
+   | Modify | [path pattern] | [what to change] |
+
+   ### Implementation Steps
+   [Generalized steps from the successful plan — replace specific names with [PLACEHOLDER]]
+
+   ### Verification Criteria
+   [Generalized EARS criteria from the successful verification]
+   ```
+6. **Append to `.codebrain/memory/patterns.md`** via MCP tools.
+7. **Report:** "Pattern saved. Next time you ask for a similar task, the planner will use this as a starting template."
+
+### How Patterns Are Used
+
+When `/codebrain:plan` runs, Phase 1 Step 5 checks patterns.md for a matching pattern:
+- If a pattern matches the task description, the planner receives it as a starting template
+- The planner ADAPTS the pattern (fills in placeholders, adjusts for specifics) rather than planning from scratch
+- This saves tokens and produces more consistent results across similar tasks
+- The planner must still do blast radius analysis and constitution checks — patterns don't bypass safety

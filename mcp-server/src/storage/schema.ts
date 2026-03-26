@@ -66,6 +66,6 @@ export const DEFAULT_CONFIG: CodebrainConfig = {
   yolo: {
     auto_fix_minor: true,
     auto_fix_major: false,
-    max_fix_attempts: 3,
+    max_fix_attempts: 2,
   },
 };

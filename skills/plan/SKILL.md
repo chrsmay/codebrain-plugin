@@ -78,41 +78,55 @@ If `linearSync` is `"required"` or `"optional"` (with Linear available):
    - Call `get_document` to read the latest PRD
    - Use this for spec reconciliation later (Phase 4b)
 
-### Phase 1: Context Loading
+### Phase 1: Deterministic Context Prefetch (Stripe Minions Pattern)
+
+**All context is assembled BEFORE any agent is spawned.** The skill itself (not the agent) gathers everything deterministically. The agent receives a pre-assembled context package and focuses purely on planning — no discovery.
+
+**Tools to use in this phase:** codebrain MCP (memory, config), codebase-memory MCP (architecture, search), Linear MCP (issue details). NO agentic tools.
+
 1. Call `mcp__codebrain__codebrain_memory_read` with `file: "all"` to load project memory.
 2. **Read constitution** — `.codebrain/memory/constitution.md` is non-negotiable.
 3. Call `mcp__codebrain__codebrain_config_read` to get project settings.
 4. Read the project's conventions file (path from config, e.g., CLAUDE.md).
+5. **Check for reusable patterns:** Read `.codebrain/memory/patterns.md` — if a similar task was completed before, load that pattern as a starting template for the planner. (Blueprint Reuse — Stripe Minions Pattern 8)
 
-### Phase 1b: Codebase Intelligence (for large codebases)
-If codebase-memory MCP is available:
-5. Call `mcp__codebase_memory__get_architecture` to get the module map.
-6. Call `mcp__codebase_memory__search_graph` with task keywords to find relevant code.
-7. Call `mcp__codebase_memory__detect_changes` to check for recent modifications that might conflict.
+### Phase 1b: Codebase Intelligence Prefetch
+If codebase-memory MCP is available (deterministic MCP calls, not agentic):
+6. Call `mcp__codebase_memory__get_architecture` to get the module map.
+7. Call `mcp__codebase_memory__search_graph` with task keywords to find relevant code.
+8. Call `mcp__codebase_memory__detect_changes` to check for recent modifications.
 
-### Phase 1c: API Research (if task involves API routes or third-party SDKs)
-If the task description mentions API endpoints, SDKs, or third-party integrations:
-8. Spawn the `api-researcher` agent with:
+### Phase 1c: API Research (agentic, but scoped)
+If the task involves API endpoints, SDKs, or third-party integrations:
+9. Spawn `api-researcher` agent with ONLY:
    - The task description
    - Which APIs/SDKs are involved
-   - Instructions to fetch official docs via Context7, check versions, and return implementation guidance
-9. The api-researcher returns: documentation source, correct patterns, version status, deprecated methods, and any `[NEEDS CLARIFICATION]` markers about API usage
+   - **Tools to use:** Context7 MCP, Sonatype MCP, Read, Bash (read-only). No other MCP servers.
+10. The api-researcher returns: documentation source, correct patterns, version status, deprecated methods.
 
-### Phase 2: Planning
-10. Spawn the `planner` agent with:
-    - The user's task description (`$ARGUMENTS`)
-    - **The constitution** (full text)
-    - **API research results** (if Phase 1c was executed — official docs, correct patterns, version info)
-    - Project memory context (continuity, architecture, patterns, known issues)
-    - Knowledge graph context (architecture overview, relevant modules, recent changes)
-    - Project conventions
-    - Instructions to:
-      - Use knowledge graph and LSP for navigation
-      - Follow the API researcher's guidance for any API/SDK usage (do NOT guess API signatures)
-      - Flag ALL ambiguities with `[NEEDS CLARIFICATION]` markers
-      - Use EARS notation for verification criteria
-      - Include constitution compliance check
-      - Produce a structured plan with blast radius analysis
+### Phase 2: Planning (Agent receives pre-assembled context)
+11. **Bundle the context package:**
+    ```
+    Context package = {
+      task: user's task description,
+      constitution: full text,
+      memory: { continuity, architecture, patterns, known_issues, decisions },
+      conventions: project conventions file content,
+      codebase: { architecture_map, relevant_modules, recent_changes },
+      api_research: (if Phase 1c ran) { official_docs, correct_patterns, version_info },
+      reusable_pattern: (if found in Step 5) { prior_plan_template },
+      linear_context: (if Phase 0 ran) { issue_description, comments, status }
+    }
+    ```
+
+12. Spawn the `planner` agent with the context package and instructions to:
+    - **Do NOT discover context** — it's already provided. Focus on planning.
+    - **Tools to use:** Read, Glob, Grep, Bash (read-only). Use codebase-memory MCP and code-review-graph MCP for blast radius. Do NOT use Lighthouse, Sentry, Socket, test-coverage, or ESLint — those are for verification, not planning.
+    - If a reusable pattern was provided, adapt it rather than planning from scratch
+    - Flag ALL ambiguities with `[NEEDS CLARIFICATION]` markers
+    - Use EARS notation for verification criteria
+    - Include constitution compliance check
+    - Produce a structured plan with blast radius analysis
 
 9. **Review the plan for `[NEEDS CLARIFICATION]` markers.**
    - If markers found: present each to the user and ask for resolution
@@ -136,7 +150,7 @@ If the task description mentions API endpoints, SDKs, or third-party integration
 13. Invoke `/codebrain:verify .codebrain/active/plan.md` to run verification.
 14. If verification fails with Critical/Major issues:
     - Fix the issues
-    - Re-verify (max 3 cycles)
+    - Re-verify (max 2 cycles — then generate handoff summary)
 15. If verification passes: proceed to spec reconciliation.
 
 ### Phase 4b: Spec Reconciliation
@@ -156,7 +170,7 @@ If Linear sync is active and this task maps to a Linear issue:
 1. **Update issue status:**
    - If verification PASSED: call `update_issue` to set status to "Done"
    - If verification FAILED but within fix cycles: keep as "In Progress"
-   - If verification FAILED after 3 cycles: set to "In Review" for manual attention
+   - If verification FAILED after 2 cycles: set to "In Review" for manual attention
 
 2. **Post completion comment:**
    - Call `create_comment` on the issue with:
