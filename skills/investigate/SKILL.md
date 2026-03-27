@@ -1,6 +1,7 @@
 ---
 name: investigate
 description: "Deep multi-system investigation for complex issues. Traces problems across boundaries: frontend -> API -> database -> external services. Builds evidence timeline and identifies root cause. Use for intermittent failures, race conditions, data inconsistencies, and issues that span multiple components."
+version: 1.0.0
 metadata:
   priority: 7
   pathPatterns:

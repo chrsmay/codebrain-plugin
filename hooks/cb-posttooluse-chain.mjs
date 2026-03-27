@@ -6,14 +6,13 @@
  * Fully synchronous to avoid timeout/cancellation issues.
  */
 
-import { readFileSync, existsSync, mkdirSync, writeFileSync, readdirSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execSync } from "node:child_process";
-import { createHash } from "node:crypto";
-import { tmpdir } from "node:os";
 import { buildSkillMap } from "./cb-skill-map.mjs";
 import { compileSkillPatterns, matchPathWithReason } from "./cb-patterns.mjs";
+import { tryClaimSkill, listClaimedSkills, safeReadFile } from "./cb-env.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PLUGIN_ROOT = join(__dirname, "..");
@@ -39,31 +38,6 @@ function out(additionalContext) {
   if (!additionalContext) { process.stdout.write("{}"); }
   else { process.stdout.write(JSON.stringify({ hookSpecificOutput: { additionalContext } })); }
   process.exit(0);
-}
-
-// ── Dedup helpers ────────────────────────────────────────
-function safeSessionSegment(sid) {
-  if (!sid) return "default";
-  if (/^[a-zA-Z0-9_-]+$/.test(sid) && sid.length < 80) return sid;
-  return createHash("sha256").update(sid).digest("hex").slice(0, 24);
-}
-
-const dedupDir = join(tmpdir(), `codebrain-${safeSessionSegment(sessionId)}-seen-skills.d`);
-
-function getSeenSkills() {
-  if (!existsSync(dedupDir)) return new Set();
-  try { return new Set(readdirSync(dedupDir).map(f => decodeURIComponent(f))); } catch { return new Set(); }
-}
-
-function claimSkill(name) {
-  if (!existsSync(dedupDir)) mkdirSync(dedupDir, { recursive: true });
-  const file = join(dedupDir, encodeURIComponent(name));
-  if (existsSync(file)) return false;
-  try { writeFileSync(file, Date.now().toString(), { flag: "wx" }); return true; } catch { return false; }
-}
-
-function safeRead(fp) {
-  try { return readFileSync(fp, "utf-8"); } catch { return ""; }
 }
 
 // ── Collect results ──────────────────────────────────────
@@ -111,9 +85,9 @@ if ((toolName === "Write" || toolName === "Edit") && filePath) {
   }
 
   if (matchedSkills.length > 0) {
-    const content = safeRead(filePath);
+    const content = safeReadFile(filePath);
     if (content) {
-      const seenSkills = getSeenSkills();
+      const seenSkills = new Set(listClaimedSkills(sessionId));
       const chains = [];
       const seenTargets = new Set();
 
@@ -151,7 +125,7 @@ if ((toolName === "Write" || toolName === "Edit") && filePath) {
           const byteLen = Buffer.byteLength(skillContent, "utf-8");
           if (totalBytes + byteLen > CHAIN_BUDGET_BYTES) break;
 
-          claimSkill(chain.targetSkill);
+          tryClaimSkill(sessionId, chain.targetSkill);
           chainParts.push(`  - "${chain.targetSkill}" chained from "${chain.sourceSkill}": ${chain.message}`);
           chainParts.push("");
           chainParts.push(skillContent);

@@ -1,6 +1,7 @@
 ---
 name: yolo
 description: "Use when you want fully automated Plan → Execute → Verify with auto-commit. Uses task recitation to prevent drift, circuit breakers for safety, and fresh context per task. Pauses on Critical issues and unresolved [NEEDS CLARIFICATION] markers."
+version: 1.0.0
 metadata:
   priority: 7
   pathPatterns:

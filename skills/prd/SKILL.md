@@ -1,6 +1,7 @@
 ---
 name: prd
 description: "Use after /codebrain:discover to write a Product Requirements Document. Generates a structured PRD (<1200 words) with P0/P1/P2 requirements, user stories, success metrics, and non-goals. Validates against anti-patterns. Every P0 requirement traces to a user need. Outputs machine-readable acceptance criteria for AI agents."
+version: 1.0.0
 metadata:
   priority: 7
   pathPatterns:

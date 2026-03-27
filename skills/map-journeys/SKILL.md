@@ -1,6 +1,7 @@
 ---
 name: map-journeys
 description: "Use after /codebrain:prd to enumerate ALL user paths through a feature — happy paths, sad paths, edge cases, and error states. Uses state machine modeling to make impossible states impossible. Generates Mermaid diagrams. Runs a pre-mortem to catch failure modes before coding. The MVP hell killer."
+version: 1.0.0
 metadata:
   priority: 5
   pathPatterns:

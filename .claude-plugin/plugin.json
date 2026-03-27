@@ -2,5 +2,9 @@
   "name": "codebrain",
   "description": "Spec-driven development engine. Plan, execute, verify workflow with persistent project memory, code quality scanning, and multi-artifact epic management.",
   "version": "1.0.0",
-  "author": { "name": "Christian Mayfield" }
+  "author": { "name": "Christian Mayfield" },
+  "repository": "https://github.com/chrsmay/codebrain-plugin",
+  "license": "MIT",
+  "keywords": ["development", "planning", "verification", "code-quality", "lifecycle"],
+  "homepage": "https://github.com/chrsmay/codebrain-plugin"
 }

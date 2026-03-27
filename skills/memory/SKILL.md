@@ -1,6 +1,7 @@
 ---
 name: memory
 description: "Use when initializing a project for codebrain, loading project context, updating memory after work, or resetting project knowledge. Subcommands: reset (initialize .codebrain/ with constitution), load (display memory), update (refresh from recent work)."
+version: 1.0.0
 metadata:
   priority: 9
   pathPatterns:

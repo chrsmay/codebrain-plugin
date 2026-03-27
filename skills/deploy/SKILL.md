@@ -1,6 +1,7 @@
 ---
 name: deploy
 description: "Deployment orchestration and environment management. Handles deploy commands, env vars, CI/CD pipelines, promote/rollback procedures. Platform-agnostic: supports Vercel, Docker, Fly.io, Railway, and custom CI/CD. Use when deploying, setting up pipelines, or managing environments."
+version: 1.0.0
 metadata:
   priority: 6
   pathPatterns:

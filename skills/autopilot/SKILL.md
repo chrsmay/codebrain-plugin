@@ -1,8 +1,14 @@
 ---
 name: autopilot
 description: "Use for fire-and-forget execution via Remote Control. Wraps YOLO mode with Remote Control session bridging, pre-flight checks, phone-readable pause summaries, and completion reports. Start a task at your desk, monitor and approve from your phone. Inspired by Stripe's Minions fire-and-forget pattern."
+version: 1.0.0
 metadata:
   priority: 7
+  pathPatterns:
+    - "**/.codebrain/autopilot*"
+    - "**/.codebrain/remote*"
+  bashPatterns:
+    - "remote|autopilot|fire.and.forget"
   promptSignals:
     phrases:
       - "run this while I'm away"

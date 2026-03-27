@@ -1,6 +1,7 @@
 ---
 name: launch
 description: "Use when a feature is implemented and verified but not yet shipped. Generates a stack-aware pre-launch checklist covering performance, security, accessibility, error handling, monitoring, and rollback. Validates Definition of Done. Creates a rollout plan with feature flags. Prevents shipping broken features."
+version: 1.0.0
 metadata:
   priority: 6
   pathPatterns:

@@ -7,13 +7,12 @@
  * Fully synchronous to avoid timeout/cancellation issues.
  */
 
-import { readFileSync, existsSync, mkdirSync, writeFileSync, readdirSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createHash } from "node:crypto";
-import { tmpdir } from "node:os";
 import { compileSkillPatterns, matchPathWithReason, matchBashWithReason, rankEntries } from "./cb-patterns.mjs";
 import { buildSkillMap } from "./cb-skill-map.mjs";
+import { tryClaimSkill, listClaimedSkills, clearHighPrioritySkills } from "./cb-env.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PLUGIN_ROOT = join(__dirname, "..");
@@ -44,45 +43,13 @@ function out(additionalContext) {
   process.exit(0);
 }
 
-// ── Dedup helpers (inline to avoid async imports) ────────
-function safeSessionSegment(sid) {
-  if (!sid) return "default";
-  if (/^[a-zA-Z0-9_-]+$/.test(sid) && sid.length < 80) return sid;
-  return createHash("sha256").update(sid).digest("hex").slice(0, 24);
-}
-
-const dedupDir = join(tmpdir(), `codebrain-${safeSessionSegment(sessionId)}-seen-skills.d`);
-
-function getSeenSkills() {
-  if (!existsSync(dedupDir)) return new Set();
-  try { return new Set(readdirSync(dedupDir).map(f => decodeURIComponent(f))); } catch { return new Set(); }
-}
-
-function claimSkill(name) {
-  if (!existsSync(dedupDir)) mkdirSync(dedupDir, { recursive: true });
-  const file = join(dedupDir, encodeURIComponent(name));
-  if (existsSync(file)) return false;
-  try { writeFileSync(file, Date.now().toString(), { flag: "wx" }); return true; } catch { return false; }
-}
-
 // ── Load skills ──────────────────────────────────────────
 const skillMap = buildSkillMap(join(PLUGIN_ROOT, "skills"));
 const compiled = compileSkillPatterns(skillMap);
 
 // ── Check for compaction reset ───────────────────────────
 if (process.env.CODEBRAIN_CONTEXT_COMPACTED === "true") {
-  // Clear seen-skills for high-priority skills so they re-inject
-  if (existsSync(dedupDir)) {
-    try {
-      for (const f of readdirSync(dedupDir)) {
-        const skillName = decodeURIComponent(f);
-        const skill = skillMap[skillName];
-        if (skill && (skill.priority || 0) >= COMPACTION_REINJECT_PRIORITY) {
-          try { require("fs").unlinkSync(join(dedupDir, f)); } catch {}
-        }
-      }
-    } catch {}
-  }
+  clearHighPrioritySkills(sessionId, skillMap, COMPACTION_REINJECT_PRIORITY);
   delete process.env.CODEBRAIN_CONTEXT_COMPACTED;
 }
 
@@ -114,7 +81,7 @@ if (toolName === "Bash") {
 if (matches.length === 0) out(null);
 
 // ── Dedup against seen skills ────────────────────────────
-const seenSkills = getSeenSkills();
+const seenSkills = new Set(listClaimedSkills(sessionId));
 const fresh = matches.filter(m => !seenSkills.has(m.skill));
 if (fresh.length === 0) out(null);
 
@@ -146,7 +113,7 @@ for (const entry of ranked) {
     continue;
   }
 
-  if (!claimSkill(entry.skill)) continue;
+  if (!tryClaimSkill(sessionId, entry.skill)) continue;
 
   injected.push({ skill: entry.skill, content });
   usedBytes += byteLen;

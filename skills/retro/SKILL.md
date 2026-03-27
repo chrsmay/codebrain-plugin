@@ -1,6 +1,7 @@
 ---
 name: retro
 description: "Use after shipping a feature to run a structured retrospective. Gathers metrics (what shipped, what was cut, time spent), identifies what went well and what didn't, updates the PRD with learnings, and plans the next iteration. Prevents 'ship once and forget' — the root cause of MVP hell."
+version: 1.0.0
 metadata:
   priority: 4
   pathPatterns:

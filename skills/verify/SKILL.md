@@ -1,6 +1,7 @@
 ---
 name: verify
 description: "Use when checking if implementation matches a plan or spec, after completing code changes, before claiming work is done, or when you need to run build/test/lint checks. Checks EARS acceptance criteria, runs automated checks, detects spec deviations, categorizes issues by severity."
+version: 1.0.0
 metadata:
   priority: 7
   pathPatterns:

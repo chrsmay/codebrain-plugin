@@ -1,6 +1,7 @@
 ---
 name: discover
 description: "Use BEFORE writing a PRD. Structured problem discovery that validates whether a feature is worth building. Asks who has the problem, how painful it is, what alternatives exist, and what success looks like. Outputs an opportunity statement. Prevents building things nobody wants."
+version: 1.0.0
 metadata:
   priority: 6
   pathPatterns:

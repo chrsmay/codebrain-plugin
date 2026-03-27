@@ -1,6 +1,7 @@
 ---
 name: refactor
 description: "Use when restructuring code without changing behavior — extracting functions, splitting files, renaming, reorganizing modules, reducing complexity, or cleaning up debt. Ensures behavior is preserved through snapshot testing before and after. Not for bug fixes or features."
+version: 1.0.0
 metadata:
   priority: 6
   pathPatterns:

@@ -1,6 +1,7 @@
 ---
 name: epic
 description: "Use when starting a large feature, managing multi-ticket work, or tracking specs/tickets/decisions. Subcommands: create (specs + tickets with EARS requirements and Given/When/Then acceptance criteria), work (next ticket), status (progress)."
+version: 1.0.0
 metadata:
   priority: 7
   pathPatterns:

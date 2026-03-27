@@ -1,6 +1,7 @@
 ---
 name: observe
 description: "Orchestrated debugging coordinator. Triggers on frustration signals (stuck, hung, broken) and systematically triages: runtime logs -> server health -> test output -> build status. Reports findings at every step. Use when something is not responding, hanging, timing out, or producing no output."
+version: 1.0.0
 metadata:
   priority: 8
   pathPatterns:

@@ -1,6 +1,7 @@
 ---
 name: review
 description: "Use when reviewing code for bugs, performance issues, security vulnerabilities, or quality problems. Deep agentic review that reads full files and traces imports, not just diffs. Categorizes by severity."
+version: 1.0.0
 metadata:
   priority: 5
   pathPatterns:

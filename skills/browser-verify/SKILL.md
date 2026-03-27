@@ -1,6 +1,7 @@
 ---
 name: browser-verify
 description: "Browser-based verification of UI changes. Checks that pages load, elements render correctly, no console errors. Triggers after dev server start or accumulated UI file changes. Use when visual verification is needed — blank pages, broken layouts, missing elements."
+version: 1.0.0
 metadata:
   priority: 6
   pathPatterns:

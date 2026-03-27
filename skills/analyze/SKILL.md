@@ -1,6 +1,7 @@
 ---
 name: analyze
 description: "Use when checking for stale artifacts, spec-code divergence, missing requirements, inconsistencies between specs and implementation, or cross-artifact conflicts. Detects drift, staleness, and gaps across all codebrain artifacts."
+version: 1.0.0
 metadata:
   priority: 5
   pathPatterns:

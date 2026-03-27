@@ -1,6 +1,7 @@
 ---
 name: debug
 description: "Use when something is broken, failing, hanging, erroring, or behaving unexpectedly. Systematic debugging workflow: reproduce → isolate → hypothesize → fix → verify. Prevents guessing and shotgun fixes. Also triggers on frustration signals like 'why isn't this working', 'it's broken', 'stuck'."
+version: 1.0.0
 metadata:
   priority: 8
   pathPatterns:

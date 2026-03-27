@@ -1,6 +1,7 @@
 ---
 name: quality
 description: "Use when scanning for dead code, unused imports, stub functions, duplicate logic, or general code quality issues. Runs automated detection tools and AI-powered analysis to find problems that linters miss."
+version: 1.0.0
 metadata:
   priority: 5
   pathPatterns:

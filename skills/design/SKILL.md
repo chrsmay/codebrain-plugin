@@ -1,6 +1,7 @@
 ---
 name: design
 description: "Use when creating UI mockups, wireframes, design systems, or visual prototypes before implementing frontend code. Uses Pencil.dev MCP to create designs in .pen files, validate visually with screenshots, then generate code from approved designs. Design-first workflow for UI features."
+version: 1.0.0
 metadata:
   priority: 4
   pathPatterns:

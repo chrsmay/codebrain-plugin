@@ -52,7 +52,7 @@ const commands = "/codebrain:plan, /codebrain:epic, /codebrain:review, " +
   "/codebrain:verify, /codebrain:yolo, /codebrain:quality, /codebrain:memory, /codebrain:debug, " +
   "/codebrain:discover, /codebrain:prd, /codebrain:design, /codebrain:launch, /codebrain:retro, " +
   "/codebrain:analyze, /codebrain:refactor, /codebrain:map-journeys, /codebrain:observe, " +
-  "/codebrain:investigate, /codebrain:deploy, /codebrain:browser-verify";
+  "/codebrain:investigate, /codebrain:deploy, /codebrain:autopilot, /codebrain:browser-verify";
 
 if (!codebrainDir) {
   process.stdout.write(JSON.stringify({

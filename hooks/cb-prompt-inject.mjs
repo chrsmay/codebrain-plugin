@@ -6,11 +6,12 @@
  * Fully synchronous to avoid timeout/cancellation issues.
  */
 
-import { readFileSync, existsSync, mkdirSync, writeFileSync, readdirSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createHash } from "node:crypto";
-import { tmpdir } from "node:os";
+import { buildSkillMap } from "./cb-skill-map.mjs";
+import { matchPromptAgainstSkills } from "./cb-prompt-patterns.mjs";
+import { tryClaimSkill, listClaimedSkills } from "./cb-env.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PLUGIN_ROOT = join(__dirname, "..");
@@ -35,10 +36,6 @@ if (!userPrompt || userPrompt.length < 5) {
   process.exit(0);
 }
 
-// ── Import skill map and prompt matching ─────────────────
-const { buildSkillMap } = await import("./cb-skill-map.mjs");
-const { matchPromptAgainstSkills } = await import("./cb-prompt-patterns.mjs");
-
 const skillMap = buildSkillMap(join(PLUGIN_ROOT, "skills"));
 const matches = matchPromptAgainstSkills(userPrompt, skillMap);
 
@@ -48,29 +45,7 @@ if (matches.length === 0) {
 }
 
 // ── Dedup against seen skills ────────────────────────────
-function safeSessionSegment(sid) {
-  if (!sid) return "default";
-  if (/^[a-zA-Z0-9_-]+$/.test(sid) && sid.length < 80) return sid;
-  return createHash("sha256").update(sid).digest("hex").slice(0, 24);
-}
-
-function getSeenSkills() {
-  const dir = join(tmpdir(), `codebrain-${safeSessionSegment(sessionId)}-seen-skills.d`);
-  if (!existsSync(dir)) return new Set();
-  try {
-    return new Set(readdirSync(dir).map(f => decodeURIComponent(f)));
-  } catch { return new Set(); }
-}
-
-function claimSkill(name) {
-  const dir = join(tmpdir(), `codebrain-${safeSessionSegment(sessionId)}-seen-skills.d`);
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  const file = join(dir, encodeURIComponent(name));
-  if (existsSync(file)) return false;
-  try { writeFileSync(file, Date.now().toString(), { flag: "wx" }); return true; } catch { return false; }
-}
-
-const seenSkills = getSeenSkills();
+const seenSkills = new Set(listClaimedSkills(sessionId));
 const fresh = matches.filter(m => !seenSkills.has(m.skill));
 
 if (fresh.length === 0) {
@@ -102,7 +77,7 @@ for (const match of fresh.slice(0, MAX_PROMPT_SKILLS + 2)) {
     continue;
   }
 
-  if (!claimSkill(match.skill)) continue;
+  if (!tryClaimSkill(sessionId, match.skill)) continue;
 
   injected.push({ skill: match.skill, content, score: match.score, matchedPhrases: match.matchedPhrases });
   usedBytes += byteLen;

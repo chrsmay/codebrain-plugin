@@ -1,6 +1,7 @@
 ---
 name: plan
 description: "Use when implementing a feature, fixing a bug, refactoring, or making any code change. Generates a structured plan with EARS criteria and [NEEDS CLARIFICATION] markers, executes it, then auto-verifies with spec reconciliation. The core Plan → Execute → Verify loop."
+version: 1.0.0
 metadata:
   priority: 8
   pathPatterns:
