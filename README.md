@@ -6,7 +6,7 @@ Spec-driven development engine that replaces Traycer AI. Complete lifecycle from
 
 - **21 skills** covering the full development lifecycle: discover → PRD → journey mapping → design → epic → plan → yolo/autopilot → verify → review → quality → debug → investigate → observe → refactor → analyze → deploy → browser-verify → launch → retro
 - **4 specialized agents**: planner, verifier, api-researcher, epic orchestrator (bart)
-- **9 MCP servers** (all free): codebase knowledge graph, code review graph, ESLint, supply chain security (Socket), test coverage, error tracking (Sentry), Pare (git analysis), Lighthouse, and a custom artifact/workflow/memory server
+- **10 MCP servers** (all free): codebase knowledge graph, code review graph, ESLint, supply chain security (Socket), test coverage, error tracking (Sentry), Pare (git analysis), Lighthouse, Context7 (live library docs), and a custom artifact/workflow/memory server
 - **5 hook events**: SessionStart (context loading), PreToolUse (skill injection), UserPromptSubmit (prompt signal matching), PostToolUse (typecheck + chain-to), SessionEnd (cleanup)
 - **Constitution-driven**: SOLID principles, code simplicity hard limits, and forbidden anti-patterns enforced on every change
 - **Drift prevention**: `[NEEDS CLARIFICATION]` markers, `[SPEC_DEVIATION]` detection, task recitation, fresh context per task, circuit breakers
