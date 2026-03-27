@@ -16,7 +16,7 @@ Spec-driven development engine that replaces Traycer AI. Complete lifecycle from
 
 ```bash
 # Clone into Claude Code plugins directory
-git clone https://github.com/ChristianMayfieldIT1025/codebrain-plugin.git ~/.claude/plugins/codebrain
+git clone https://github.com/chrsmay/codebrain-plugin.git ~/.claude/plugins/codebrain
 
 # Build the MCP server
 cd ~/.claude/plugins/codebrain/mcp-server && npm install && npm run build
