@@ -1,0 +1,19 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "codebrain",
+  "description": "Spec-driven development engine with persistent project memory, code quality scanning, and multi-artifact epic management.",
+  "owner": {
+    "name": "Christian Mayfield"
+  },
+  "plugins": [
+    {
+      "name": "codebrain",
+      "description": "Spec-driven development engine. Plan, execute, verify workflow with persistent project memory, code quality scanning, and multi-artifact epic management.",
+      "category": "development",
+      "source": {
+        "source": "self"
+      },
+      "homepage": "https://github.com/chrsmay/codebrain-plugin"
+    }
+  ]
+}
